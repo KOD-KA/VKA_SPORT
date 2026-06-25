@@ -15,5 +15,8 @@ data class ExerciseHistoryEntity(
     val bestVolume: Float,
 
     val recordDate: Long? = null,
-    val athleteWeight: Float? = null
+    val athleteWeight: Float? = null,
+    // Подход, давший лучший объём
+    val bestVolumeWeight: Float? = null,
+    val bestVolumeReps: Int? = null
 )

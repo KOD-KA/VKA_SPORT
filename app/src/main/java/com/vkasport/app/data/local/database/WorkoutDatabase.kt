@@ -17,46 +17,25 @@ import com.vkasport.app.data.local.entity.ExerciseHistoryEntity
 import com.vkasport.app.data.local.dao.CompletedWorkoutExerciseDao
 import com.vkasport.app.data.local.dao.CompletedWorkoutSetDao
 
-
 @Database(
     entities = [
-
         WorkoutEntity::class,
-
         ExerciseEntity::class,
-
         ExerciseSetEntity::class,
-
         CompletedWorkoutEntity::class,
-
         CompletedWorkoutExerciseEntity::class,
-
         CompletedWorkoutSetEntity::class,
-
         ExerciseHistoryEntity::class
-
     ],
-
-    version = 9,
-
+    version = 10,           // 9 → 10: добавлены bestVolumeWeight, bestVolumeReps
     exportSchema = false
 )
-
 abstract class WorkoutDatabase : RoomDatabase() {
-
     abstract fun workoutDao(): WorkoutDao
-
     abstract fun exerciseDao(): ExerciseDao
-
     abstract fun exerciseSetDao(): ExerciseSetDao
-
     abstract fun workoutHistoryDao(): WorkoutHistoryDao
-
     abstract fun exerciseHistoryDao(): ExerciseHistoryDao
-
-    abstract fun completedWorkoutExerciseDao():
-            CompletedWorkoutExerciseDao
-
-    abstract fun completedWorkoutSetDao():
-            CompletedWorkoutSetDao
+    abstract fun completedWorkoutExerciseDao(): CompletedWorkoutExerciseDao
+    abstract fun completedWorkoutSetDao(): CompletedWorkoutSetDao
 }

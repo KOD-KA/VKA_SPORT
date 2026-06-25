@@ -22,19 +22,13 @@ import com.vkasport.app.data.local.entity.ExerciseHistoryEntity
 import com.vkasport.app.data.local.entity.CompletedWorkoutExerciseEntity
 import com.vkasport.app.data.local.entity.CompletedWorkoutSetEntity
 
-
 class TrainingSessionViewModel(
     private val database: WorkoutDatabase
 ) : ViewModel() {
 
-    private val _state =
-        MutableStateFlow(CurrentWorkoutState())
-
-    private val _completedWorkouts =
-        MutableStateFlow<List<CompletedWorkout>>(emptyList())
-
-    private val _exerciseHistory =
-        MutableStateFlow<Map<String, ExerciseHistory>>(emptyMap())
+    private val _state = MutableStateFlow(CurrentWorkoutState())
+    private val _completedWorkouts = MutableStateFlow<List<CompletedWorkout>>(emptyList())
+    private val _exerciseHistory = MutableStateFlow<Map<String, ExerciseHistory>>(emptyMap())
 
     val exerciseHistory = _exerciseHistory.asStateFlow()
     val completedWorkouts = _completedWorkouts.asStateFlow()
@@ -53,26 +47,14 @@ class TrainingSessionViewModel(
         )
     }
 
-    fun addSetToExercise(
-        exerciseName: String,
-        weight: Float,
-        reps: Int
-    ) {
+    fun addSetToExercise(exerciseName: String, weight: Float, reps: Int) {
         val updatedExercises = _state.value.selectedExercises.map { exercise ->
-            if (exercise.name == exerciseName) {
+            if (exercise.name == exerciseName)
                 exercise.copy(sets = exercise.sets + WorkoutSet(weight = weight, reps = reps))
-            } else {
-                exercise
-            }
+            else exercise
         }
-
         _state.value = _state.value.copy(selectedExercises = updatedExercises)
-
-        updateExerciseStats(
-            exerciseName = exerciseName,
-            weight = weight,
-            reps = reps
-        )
+        updateExerciseStats(exerciseName, weight, reps)
     }
 
     fun updateAthleteWeight(weight: Float) {
@@ -80,10 +62,7 @@ class TrainingSessionViewModel(
     }
 
     fun startTraining() {
-        _state.value = _state.value.copy(
-            trainingStarted = true,
-            currentScreen = "weight"
-        )
+        _state.value = _state.value.copy(trainingStarted = true, currentScreen = "weight")
     }
 
     fun setCurrentScreen(screen: String) {
@@ -99,32 +78,21 @@ class TrainingSessionViewModel(
     // ==================== FINISH WORKOUT ====================
 
     fun finishCurrentWorkout() {
-
         val currentState = _state.value
 
         viewModelScope.launch {
-
             val workoutId = database.workoutHistoryDao().insertWorkout(
                 CompletedWorkoutEntity(
                     date = System.currentTimeMillis(),
-                    duration = Duration.between(
-                        currentState.workoutStartTime,
-                        LocalDateTime.now()
-                    ).toMinutes(),
+                    duration = Duration.between(currentState.workoutStartTime, LocalDateTime.now()).toMinutes(),
                     athleteWeight = currentState.athleteWeight,
                     muscleGroup = currentState.selectedMuscleGroup?.title ?: "Не выбрано"
                 )
             )
-
             currentState.selectedExercises.forEach { exercise ->
-
                 database.completedWorkoutExerciseDao().insert(
-                    CompletedWorkoutExerciseEntity(
-                        workoutId = workoutId,
-                        exerciseName = exercise.name
-                    )
+                    CompletedWorkoutExerciseEntity(workoutId = workoutId, exerciseName = exercise.name)
                 )
-
                 exercise.sets.forEach { set ->
                     database.completedWorkoutSetDao().insert(
                         CompletedWorkoutSetEntity(
@@ -138,52 +106,41 @@ class TrainingSessionViewModel(
             }
         }
 
-        val durationMinutes = Duration.between(
-            currentState.workoutStartTime,
-            LocalDateTime.now()
-        ).toMinutes()
-
-        // Добавляем в память сразу — exercises здесь корректны,
-        // т.к. берём из текущей сессии
         val completedWorkout = CompletedWorkout(
             dateTime = currentState.workoutStartTime,
             athleteWeight = currentState.athleteWeight,
             muscleGroup = currentState.selectedMuscleGroup?.title ?: "Не выбрано",
             exercises = currentState.selectedExercises,
-            durationMinutes = durationMinutes
+            durationMinutes = Duration.between(currentState.workoutStartTime, LocalDateTime.now()).toMinutes()
         )
-
         _completedWorkouts.value = _completedWorkouts.value + completedWorkout
-
         _state.value = _state.value.copy(currentScreen = "summary")
     }
 
     // ==================== EXERCISE STATS ====================
 
-    fun updateExerciseStats(
-        exerciseName: String,
-        weight: Float,
-        reps: Int
-    ) {
-        val volume = weight * reps
+    fun updateExerciseStats(exerciseName: String, weight: Float, reps: Int) {
+        val volume  = weight * reps
         val current = _exerciseHistory.value[exerciseName]
 
-        val isNewRecord = weight > (current?.maxWeight ?: 0f)
+        val isNewWeightRecord  = weight  > (current?.maxWeight  ?: 0f)
+        val isNewVolumeRecord  = volume  > (current?.bestVolume ?: 0f)
 
         val updated = ExerciseHistory(
-            exerciseName = exerciseName,
-            maxWeight = maxOf(current?.maxWeight ?: 0f, weight),
-            maxWeightReps = when {
-                isNewRecord -> reps
-                else -> current?.maxWeightReps ?: 0
-            },
-            maxReps = maxOf(current?.maxReps ?: 0, reps),
-            bestVolume = maxOf(current?.bestVolume ?: 0f, volume),
-            recordDate = if (isNewRecord) {
-                LocalDateTime.now()
-            } else {
-                current?.recordDate ?: LocalDateTime.now()
-            }
+            exerciseName     = exerciseName,
+            maxWeight        = maxOf(current?.maxWeight ?: 0f, weight),
+            maxWeightReps    = if (isNewWeightRecord) reps else (current?.maxWeightReps ?: 0),
+            maxReps          = maxOf(current?.maxReps ?: 0, reps),
+            bestVolume       = maxOf(current?.bestVolume ?: 0f, volume),
+            // Дата — обновляем только при новом рекорде веса
+            recordDate       = if (isNewWeightRecord) LocalDateTime.now()
+            else current?.recordDate ?: LocalDateTime.now(),
+            // Вес атлета в момент рекорда
+            athleteWeight    = if (isNewWeightRecord) _state.value.athleteWeight
+            else current?.athleteWeight,
+            // Разбивка объёма: подход, давший лучший объём
+            bestVolumeWeight = if (isNewVolumeRecord) weight else current?.bestVolumeWeight,
+            bestVolumeReps   = if (isNewVolumeRecord) reps   else current?.bestVolumeReps
         )
 
         _exerciseHistory.value = _exerciseHistory.value + (exerciseName to updated)
@@ -191,18 +148,16 @@ class TrainingSessionViewModel(
         viewModelScope.launch {
             database.exerciseHistoryDao().save(
                 ExerciseHistoryEntity(
-                    exerciseName = updated.exerciseName,
-                    maxWeight = updated.maxWeight,
-                    maxWeightReps = updated.maxWeightReps,
-                    maxReps = updated.maxReps,
-                    bestVolume = updated.bestVolume,
-                    // ИСПРАВЛЕНО: сохраняем время в локальном часовом поясе
-                    recordDate = updated.recordDate
-                        ?.atZone(ZoneId.systemDefault())
-                        ?.toInstant()
-                        ?.toEpochMilli(),
-                    // ИСПРАВЛЕНО: сохраняем вес атлета при рекорде
-                    athleteWeight = _state.value.athleteWeight
+                    exerciseName     = updated.exerciseName,
+                    maxWeight        = updated.maxWeight,
+                    maxWeightReps    = updated.maxWeightReps,
+                    maxReps          = updated.maxReps,
+                    bestVolume       = updated.bestVolume,
+                    recordDate       = updated.recordDate
+                        ?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
+                    athleteWeight    = updated.athleteWeight,
+                    bestVolumeWeight = updated.bestVolumeWeight,
+                    bestVolumeReps   = updated.bestVolumeReps
                 )
             )
         }
@@ -211,80 +166,49 @@ class TrainingSessionViewModel(
     // ==================== LOAD FROM DATABASE ====================
 
     fun loadArchiveFromDatabase() {
-
         viewModelScope.launch {
-
             val workoutEntities = database.workoutHistoryDao().getAllWorkouts()
-
             val completedWorkouts = workoutEntities.map { entity ->
-
-                // Загружаем упражнения для тренировки
-                val exerciseEntities = database.completedWorkoutExerciseDao()
-                    .getByWorkout(entity.id)
-
-                // Загружаем ВСЕ сеты тренировки одним запросом (эффективнее N+1)
-                val allSets = database.completedWorkoutSetDao()
-                    .getByWorkout(entity.id)
-
-                // Группируем сеты по названию упражнения
+                val exerciseEntities = database.completedWorkoutExerciseDao().getByWorkout(entity.id)
+                val allSets = database.completedWorkoutSetDao().getByWorkout(entity.id)
                 val setsByExercise = allSets.groupBy { it.exerciseName }
-
-                // Строим список упражнений с подходами
                 val exercises = exerciseEntities.map { exerciseEntity ->
                     val sets = setsByExercise[exerciseEntity.exerciseName] ?: emptyList()
                     WorkoutExercise(
                         name = exerciseEntity.exerciseName,
-                        sets = sets.map { setEntity ->
-                            WorkoutSet(
-                                weight = setEntity.weight,
-                                reps = setEntity.reps
-                            )
-                        }
+                        sets = sets.map { WorkoutSet(weight = it.weight, reps = it.reps) }
                     )
                 }
-
                 CompletedWorkout(
                     id = entity.id,
-                    // ИСПРАВЛЕНО: используем локальный часовой пояс вместо UTC
                     dateTime = Instant.ofEpochMilli(entity.date)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime(),
+                        .atZone(ZoneId.systemDefault()).toLocalDateTime(),
                     athleteWeight = entity.athleteWeight,
                     muscleGroup = entity.muscleGroup,
-                    // ИСПРАВЛЕНО: exercises больше не emptyList()
                     exercises = exercises,
                     durationMinutes = entity.duration ?: 0
                 )
             }
-
             _completedWorkouts.value = completedWorkouts
         }
     }
 
     fun loadRecordsFromDatabase() {
-
         viewModelScope.launch {
-
             val data = database.exerciseHistoryDao().getAll()
-
-            _exerciseHistory.value = data.associateBy { entity ->
-                entity.exerciseName
-            }.mapValues { entry ->
-
-                val entity = entry.value
-
+            _exerciseHistory.value = data.associateBy { it.exerciseName }.mapValues { (_, entity) ->
                 ExerciseHistory(
-                    exerciseName = entity.exerciseName,
-                    maxWeight = entity.maxWeight,
-                    maxWeightReps = entity.maxWeightReps,
-                    maxReps = entity.maxReps,
-                    bestVolume = entity.bestVolume,
-                    // ИСПРАВЛЕНО: recordDate теперь восстанавливается из БД
-                    recordDate = entity.recordDate?.let { epochMillis ->
-                        Instant.ofEpochMilli(epochMillis)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDateTime()
-                    }
+                    exerciseName     = entity.exerciseName,
+                    maxWeight        = entity.maxWeight,
+                    maxWeightReps    = entity.maxWeightReps,
+                    maxReps          = entity.maxReps,
+                    bestVolume       = entity.bestVolume,
+                    recordDate       = entity.recordDate?.let { ms ->
+                        Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDateTime()
+                    },
+                    athleteWeight    = entity.athleteWeight,
+                    bestVolumeWeight = entity.bestVolumeWeight,
+                    bestVolumeReps   = entity.bestVolumeReps
                 )
             }
         }
@@ -293,65 +217,42 @@ class TrainingSessionViewModel(
     // ==================== COMPUTED GETTERS ====================
 
     fun getDaysSinceLastWorkout(): Long? {
-        val workouts = _completedWorkouts.value
-        if (workouts.isEmpty()) return null
-        return Duration.between(workouts.last().dateTime, LocalDateTime.now()).toDays()
+        val w = _completedWorkouts.value
+        if (w.isEmpty()) return null
+        return Duration.between(w.last().dateTime, LocalDateTime.now()).toDays()
     }
 
     fun getWeightDifference(): Float? {
-        val workouts = _completedWorkouts.value
-        if (workouts.size < 2) return null
-        val currentWeight = workouts.last().athleteWeight ?: return null
-        val previousWeight = workouts[workouts.size - 2].athleteWeight ?: return null
-        return currentWeight - previousWeight
+        val w = _completedWorkouts.value
+        if (w.size < 2) return null
+        return (w.last().athleteWeight ?: return null) - (w[w.size - 2].athleteWeight ?: return null)
     }
 
-    fun getExerciseRecord(exerciseName: String): ExerciseHistory? {
-        return _exerciseHistory.value[exerciseName]
-    }
+    fun getExerciseRecord(exerciseName: String) = _exerciseHistory.value[exerciseName]
 
     fun getLastExerciseResult(exerciseName: String): WorkoutSet? {
         for (workout in _completedWorkouts.value.asReversed()) {
-            val exercise = workout.exercises.find { it.name == exerciseName }
-            if (exercise != null && exercise.sets.isNotEmpty()) {
-                return exercise.sets.last()
-            }
+            val ex = workout.exercises.find { it.name == exerciseName }
+            if (ex != null && ex.sets.isNotEmpty()) return ex.sets.last()
         }
         return null
     }
 
-    fun isExerciseRecord(
-        exerciseName: String,
-        weight: Float,
-        reps: Int
-    ): Boolean {
+    fun isExerciseRecord(exerciseName: String, weight: Float, reps: Int): Boolean {
         val record = _exerciseHistory.value[exerciseName] ?: return false
         return weight >= record.maxWeight && reps >= record.maxWeightReps
     }
 
     fun getPreviousSet(exerciseName: String, index: Int): WorkoutSet? {
         for (workout in _completedWorkouts.value.asReversed()) {
-            val exercise = workout.exercises.find { it.name == exerciseName }
-            if (exercise != null && exercise.sets.size > index) {
-                return exercise.sets[index]
-            }
+            val ex = workout.exercises.find { it.name == exerciseName }
+            if (ex != null && ex.sets.size > index) return ex.sets[index]
         }
         return null
     }
 
-    fun getCurrentExercisesCount(): Int {
-        return _state.value.selectedExercises.size
-    }
-
-    fun getCurrentSetsCount(): Int {
-        return _state.value.selectedExercises.sumOf { it.sets.size }
-    }
-
-    fun getCurrentVolume(): Float {
-        return _state.value.selectedExercises.sumOf { exercise ->
-            exercise.sets.sumOf { set ->
-                (set.weight * set.reps).toDouble()
-            }
-        }.toFloat()
-    }
+    fun getCurrentExercisesCount() = _state.value.selectedExercises.size
+    fun getCurrentSetsCount() = _state.value.selectedExercises.sumOf { it.sets.size }
+    fun getCurrentVolume() = _state.value.selectedExercises
+        .sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }.toFloat()
 }

@@ -1,29 +1,40 @@
 package com.vkasport.app.ui.records
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.model.ExerciseHistory
+import com.vkasport.app.data.model.ExerciseLibrary
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
+import com.vkasport.app.ui.theme.Gold
+import com.vkasport.app.ui.theme.LightGray
+import com.vkasport.app.ui.theme.SoftGray
 import com.vkasport.app.ui.theme.White
 import java.time.format.DateTimeFormatter
 
-// Имена совпадают с ExerciseLibrary
 private val PRIORITY_EXERCISES = listOf(
     "Жим штанги лёжа",
     "Становая тяга",
@@ -31,188 +42,194 @@ private val PRIORITY_EXERCISES = listOf(
     "Подъем штанги на бицепс"
 )
 
-@Composable
-fun ExerciseRecordsScreen(viewModel: TrainingSessionViewModel) {
+private fun fmtW(weight: Float): String =
+    if (weight == weight.toInt().toFloat()) weight.toInt().toString() else "%.1f".format(weight)
 
+private fun muscleGroupOf(name: String): String =
+    ExerciseLibrary.exercises.find { it.name == name }?.muscleGroup?.title?.lowercase() ?: ""
+
+private fun matchesRecord(record: ExerciseHistory, q: String): Boolean {
+    if (q.isBlank()) return true
+    val query = q.trim().lowercase()
+    return record.exerciseName.lowercase().contains(query) ||
+            muscleGroupOf(record.exerciseName).contains(query) ||
+            record.maxWeight.toInt().toString().contains(query)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  КОРНЕВОЙ ЭКРАН
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+fun ExerciseRecordsScreen(
+    viewModel: TrainingSessionViewModel,
+    searchQuery: String = ""
+) {
     val records by viewModel.exerciseHistory.collectAsState()
 
     val mainRecords = records.values
-        .filter { it.exerciseName in PRIORITY_EXERCISES }
+        .filter { it.exerciseName in PRIORITY_EXERCISES && matchesRecord(it, searchQuery) }
         .sortedBy { PRIORITY_EXERCISES.indexOf(it.exerciseName) }
 
     val otherRecords = records.values
-        .filter { it.exerciseName !in PRIORITY_EXERCISES }
+        .filter { it.exerciseName !in PRIORITY_EXERCISES && matchesRecord(it, searchQuery) }
         .sortedByDescending { it.recordDate }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxSize()
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-
-        // ===== ОСНОВНЫЕ РЕКОРДЫ =====
-        // item { } — встроенный метод LazyGridScope, импорт не нужен
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            SectionHeader(title = "ОСНОВНЫЕ РЕКОРДЫ")
-        }
+        item { SectionLabel("ОСНОВНЫЕ РЕКОРДЫ") }
 
         if (mainRecords.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(White, RoundedCornerShape(12.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Выполните тренировки с основными упражнениями",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DarkGray,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            item { EmptyHint(if (searchQuery.isBlank()) "Выполните тренировки с основными упражнениями" else "Ничего не найдено") }
         } else {
-            items(mainRecords) { record ->
-                RecordGridCard(record = record, isPrimary = true)
-            }
+            items(mainRecords) { RecordCard(it, true) }
         }
 
-        // ===== ДРУГИЕ РЕКОРДЫ =====
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Spacer(Modifier.height(4.dp))
-            SectionHeader(title = "ДРУГИЕ РЕКОРДЫ")
-        }
+        item { Spacer(Modifier.height(6.dp)) }
+        item { SectionLabel("ДРУГИЕ РЕКОРДЫ") }
 
         if (otherRecords.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(White, RoundedCornerShape(12.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Здесь появятся рекорды по другим упражнениям",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DarkGray,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            item { EmptyHint(if (searchQuery.isBlank()) "Здесь появятся рекорды по другим упражнениям" else "Ничего не найдено") }
         } else {
-            items(otherRecords) { record ->
-                RecordGridCard(record = record, isPrimary = false)
-            }
+            items(otherRecords) { RecordCard(it, false) }
         }
     }
 }
 
-@Composable
-private fun SectionHeader(title: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Black, RoundedCornerShape(12.dp))
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = title,
-            color = White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp
-        )
-    }
-}
+// ═══════════════════════════════════════════════════════════════════
+//  КАРТОЧКА РЕКОРДА
+// ═══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun RecordGridCard(record: ExerciseHistory, isPrimary: Boolean) {
-
+private fun RecordCard(record: ExerciseHistory, isPrimary: Boolean) {
     val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yy")
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(White, RoundedCornerShape(12.dp))
+            .background(SoftGray, RoundedCornerShape(16.dp))
     ) {
-
-        // Тёмная шапка с названием упражнения
+        // Шапка
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Black,
-                    RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 9.dp),
-            contentAlignment = Alignment.Center
+                .background(DarkGray, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Text(
-                text = record.exerciseName,
-                color = White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                lineHeight = 15.sp
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(record.exerciseName, color = White, fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp, modifier = Modifier.weight(1f))
+                if (isPrimary) {
+                    Spacer(Modifier.width(8.dp))
+                    Text("🏆", fontSize = 18.sp)
+                }
+            }
         }
 
-        Column(modifier = Modifier.padding(10.dp)) {
+        // Тело
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
 
-            if (isPrimary) {
-                Text(text = "🏆", fontSize = 16.sp)
-                Spacer(Modifier.height(4.dp))
-            }
-
-            // макс. вес
-            Text(
-                text = "макс. вес",
-                style = MaterialTheme.typography.labelSmall,
-                color = DarkGray
+            // ─ МАКС. ВЕС ────────────────────────────────────────────
+            MetricRow(
+                icon        = "🏆",
+                label       = "макс. вес",
+                bigValue    = "${record.maxWeight.toInt()}",
+                subValue    = "× ${record.maxWeightReps}",
+                date        = record.recordDate?.format(dateFmt),
+                subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
             )
 
-            Spacer(Modifier.height(2.dp))
-
-            Text(
-                text = "${record.maxWeight.toInt()} кг",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+            // Толстый разделитель
+            Spacer(Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.5.dp)
+                    .background(DarkGray.copy(alpha = 0.22f))
             )
+            Spacer(Modifier.height(10.dp))
 
-            Text(
-                text = "× ${record.maxWeightReps}",
-                fontSize = 13.sp,
-                color = DarkGray
-            )
+            // ─ МАКС. ОБЪЁМ ──────────────────────────────────────────
+            val volSubValue = if (record.bestVolumeWeight != null && record.bestVolumeReps != null)
+                "${fmtW(record.bestVolumeWeight)} × ${record.bestVolumeReps}"
+            else "кг"
 
-            record.recordDate?.let { date ->
-                Text(
-                    text = date.format(dateFmt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DarkGray
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // макс. объём
-            Text(
-                text = "макс. объём",
-                style = MaterialTheme.typography.labelSmall,
-                color = DarkGray
-            )
-
-            Text(
-                text = "${record.bestVolume.toInt()} кг",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+            MetricRow(
+                icon        = "📦",
+                label       = "макс. объём",
+                bigValue    = "${record.bestVolume.toInt()}",
+                subValue    = volSubValue,
+                date        = record.recordDate?.format(dateFmt),
+                subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
             )
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  СТРОКА МЕТРИКИ
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+private fun MetricRow(
+    icon: String, label: String,
+    bigValue: String, subValue: String,
+    date: String?, subDate: String?
+) {
+    Column {
+        Text(label, fontSize = 11.sp, color = DarkGray)
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Иконка в золотом круге
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(Gold.copy(alpha = 0.18f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) { Text(icon, fontSize = 20.sp) }
+
+            Spacer(Modifier.width(12.dp))
+
+            // Большое число + подпись
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
+                Text(bigValue, fontSize = 36.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(subValue, fontSize = 14.sp, color = DarkGray, modifier = Modifier.padding(bottom = 4.dp))
+            }
+
+            // Дата + вес атлета
+            if (date != null || subDate != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    date?.let { Text(it, fontSize = 12.sp, color = DarkGray) }
+                    subDate?.let { Text(it, fontSize = 11.sp, color = DarkGray.copy(alpha = 0.7f)) }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ВСПОМОГАТЕЛЬНЫЕ
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+private fun SectionLabel(title: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider(Modifier.weight(1f), color = LightGray)
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkGray)
+        HorizontalDivider(Modifier.weight(1f), color = LightGray)
+    }
+}
+
+@Composable
+private fun EmptyHint(text: String) {
+    Box(Modifier.fillMaxWidth().background(SoftGray, RoundedCornerShape(12.dp)).padding(16.dp),
+        contentAlignment = Alignment.Center) {
+        Text(text, fontSize = 13.sp, color = DarkGray, textAlign = TextAlign.Center)
     }
 }
