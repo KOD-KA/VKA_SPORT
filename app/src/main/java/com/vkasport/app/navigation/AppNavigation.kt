@@ -1,6 +1,5 @@
 package com.vkasport.app.navigation
 
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -10,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.vkasport.app.data.local.database.AppDatabaseProvider
 import com.vkasport.app.ui.calendar.CalendarScreen
+import com.vkasport.app.ui.info.InfoScreen
 import com.vkasport.app.ui.records.WorkoutArchiveScreen
 import com.vkasport.app.ui.training.TrainingFlowScreen
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
@@ -52,7 +52,7 @@ fun AppNavigation(
         }
 
         composable(Screen.Info.route) {
-            Text("Информация — скоро")
+            InfoScreen(viewModel = trainingViewModel)
         }
     }
 }

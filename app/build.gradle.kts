@@ -61,5 +61,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
+    // Coil — превью YouTube-видео по URL картинки
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
 }
