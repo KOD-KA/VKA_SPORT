@@ -41,7 +41,6 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         // ================= ВЕС =================
         "weight" -> {
 
-            // remember(lastWeight) — обновляем начальное значение когда данные загрузятся
             var weightText by remember(lastWeight) {
                 mutableStateOf(lastWeight?.let { "%.1f".format(it) } ?: "")
             }
@@ -91,7 +90,6 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
 
                 Spacer(Modifier.height(28.dp))
 
-                // Белая кнопка на чёрном фоне
                 Box(
                     modifier = Modifier
                         .height(50.dp)
@@ -117,6 +115,8 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         }
 
         // ================= ГРУППЫ МЫШЦ =================
+        // Этот экран открывается и для первой группы, и когда пользователь
+        // нажимает "Добавить группу мышц" на экране тренировки
         "muscles" -> {
             MuscleGroupScreen(
                 onGroupSelected = {
@@ -127,12 +127,14 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         }
 
         // ================= УПРАЖНЕНИЯ =================
+        // Список фильтруется по state.selectedMuscleGroup — эта группа
+        // устанавливается либо на экране "muscles", либо напрямую при
+        // нажатии "+" внутри уже существующей группы на экране тренировки
         "exercises" -> {
             val group = state.selectedMuscleGroup
             group?.let {
                 ExerciseSelectionScreen(
                     muscleGroup = it,
-                    // Уже добавленные упражнения — показываем галочку ✓
                     alreadyAdded = state.selectedExercises.map { ex -> ex.name },
                     onExerciseSelected = { ex ->
                         viewModel.addExercise(ex)
@@ -143,11 +145,16 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         }
 
         // ================= ТРЕНИРОВКА =================
-        // Инлайн добавление подходов прямо в TrainingScreen
+        // Упражнения сгруппированы по группам мышц; можно добавить ещё
+        // упражнение в существующую группу или добавить новую группу целиком
         "training" -> {
             TrainingScreen(
                 viewModel = viewModel,
-                onSelectMuscleGroup = {
+                onAddExerciseToGroup = { group ->
+                    viewModel.selectMuscleGroup(group)
+                    viewModel.setCurrentScreen("exercises")
+                },
+                onAddNewGroup = {
                     viewModel.setCurrentScreen("muscles")
                 },
                 onFinishWorkout = {

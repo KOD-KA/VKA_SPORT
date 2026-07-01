@@ -30,7 +30,16 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // ==================== WORKOUT ACTIONS ====================
 
     fun selectMuscleGroup(group: MuscleGroup) { _state.value = _state.value.copy(selectedMuscleGroup = group) }
-    fun addExercise(name: String) { _state.value = _state.value.copy(selectedExercises = _state.value.selectedExercises + WorkoutExercise(name = name)) }
+
+    // Упражнение всегда привязывается к группе мышц, выбранной прямо сейчас
+    // (state.selectedMuscleGroup) — это позволяет добавлять упражнения
+    // из РАЗНЫХ групп мышц в одну тренировку.
+    fun addExercise(name: String) {
+        val group = _state.value.selectedMuscleGroup ?: return
+        val exercise = WorkoutExercise(name = name, muscleGroup = group)
+        _state.value = _state.value.copy(selectedExercises = _state.value.selectedExercises + exercise)
+    }
+
     fun updateAthleteWeight(w: Float) { _state.value = _state.value.copy(athleteWeight = w) }
     fun startTraining() { _state.value = _state.value.copy(trainingStarted = true, currentScreen = "weight") }
     fun setCurrentScreen(s: String) { _state.value = _state.value.copy(currentScreen = s) }
@@ -53,13 +62,21 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun finishCurrentWorkout() {
         val s = _state.value
+
+        // Тренировка может включать несколько групп мышц —
+        // собираем все уникальные группы, использованные в сессии
+        val usedGroups = s.selectedExercises.mapNotNull { it.muscleGroup }.distinct()
+        val muscleGroupSummary =
+            if (usedGroups.isNotEmpty()) usedGroups.joinToString(", ") { it.title }
+            else s.selectedMuscleGroup?.title ?: "Не выбрано"
+
         viewModelScope.launch {
             val wid = database.workoutHistoryDao().insertWorkout(
                 CompletedWorkoutEntity(
                     date = System.currentTimeMillis(),
                     duration = Duration.between(s.workoutStartTime, LocalDateTime.now()).toMinutes(),
                     athleteWeight = s.athleteWeight,
-                    muscleGroup = s.selectedMuscleGroup?.title ?: "Не выбрано"
+                    muscleGroup = muscleGroupSummary
                 )
             )
             s.selectedExercises.forEach { ex ->
@@ -69,7 +86,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         }
         _completedWorkouts.value = _completedWorkouts.value + CompletedWorkout(
             dateTime = s.workoutStartTime, athleteWeight = s.athleteWeight,
-            muscleGroup = s.selectedMuscleGroup?.title ?: "Не выбрано",
+            muscleGroup = muscleGroupSummary,
             exercises = s.selectedExercises,
             durationMinutes = Duration.between(s.workoutStartTime, LocalDateTime.now()).toMinutes()
         )
