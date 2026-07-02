@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,9 @@ import java.time.format.DateTimeFormatter
 private fun formatW(weight: Float): String =
     if (weight == weight.toInt().toFloat()) weight.toInt().toString() else "%.1f".format(weight)
 
+private val GreenColor = Color(0xFF4CAF50)
+private val RedColor = Color(0xFFE53935)
+
 @Composable
 fun TrainingScreen(
     viewModel: TrainingSessionViewModel,
@@ -38,7 +42,6 @@ fun TrainingScreen(
     val fmt = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
     val weightDiff = viewModel.getWeightDifference()
 
-    // Группируем упражнения по группам мышц, в порядке добавления
     val groupedExercises: Map<MuscleGroup, List<WorkoutExercise>> = remember(state.selectedExercises) {
         state.selectedExercises
             .filter { it.muscleGroup != null }
@@ -48,18 +51,6 @@ fun TrainingScreen(
     val headerTitle = if (groupedExercises.isNotEmpty())
         groupedExercises.keys.joinToString(", ") { it.title }.uppercase()
     else "ТРЕНИРОВКА"
-
-    val weightLabel = state.athleteWeight?.let { w ->
-        buildString {
-            append("%.1f".format(w))
-            if (weightDiff != null) {
-                append(" (")
-                append(if (weightDiff >= 0) "+%.1f".format(weightDiff) else "%.1f".format(weightDiff))
-                append(")")
-            }
-            append(" кг")
-        }
-    } ?: "— кг"
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -72,12 +63,31 @@ fun TrainingScreen(
         ) {
             Text(headerTitle, color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "начало: ${state.workoutStartTime.format(fmt)}",
                     color = White.copy(alpha = 0.65f), fontSize = 12.sp
                 )
-                Text(weightLabel, color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                // ── Вес + цветной индикатор изменения (зелёный/красный) ──
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = state.athleteWeight?.let { "%.1f".format(it) } ?: "—",
+                        color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium
+                    )
+                    Text(" кг", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    if (weightDiff != null && weightDiff != 0f) {
+                        Spacer(Modifier.width(4.dp))
+                        val diffColor = if (weightDiff > 0f) GreenColor else RedColor
+                        val sign = if (weightDiff > 0f) "+" else ""
+                        Text(
+                            text = "($sign%.1f)".format(weightDiff),
+                            color = diffColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
 
@@ -88,7 +98,6 @@ fun TrainingScreen(
         ) {
             groupedExercises.forEach { (group, exercises) ->
 
-                // Заголовок группы мышц (чёрная плашка)
                 item(key = "group_${group.name}") {
                     Box(
                         modifier = Modifier
@@ -99,21 +108,14 @@ fun TrainingScreen(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = group.title.uppercase(),
-                            color = White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
+                        Text(group.title.uppercase(), color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
 
-                // Упражнения этой группы
                 items(exercises, key = { "ex_${it.name}" }) { exercise ->
                     InlineExerciseBlock(exercise = exercise, viewModel = viewModel)
                 }
 
-                // Кнопка "+" добавить ещё упражнение в эту же группу
                 item(key = "add_ex_${group.name}") {
                     Box(
                         modifier = Modifier
@@ -130,7 +132,6 @@ fun TrainingScreen(
                 }
             }
 
-            // Кнопка "+" добавить ещё одну группу мышц
             item(key = "add_group") {
                 Box(
                     modifier = Modifier
@@ -152,10 +153,7 @@ fun TrainingScreen(
 
         // ===== КНОПКА ЗАВЕРШИТЬ =====
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(White)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().background(White).padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
@@ -182,30 +180,22 @@ private fun InlineExerciseBlock(
     var repsInput by remember(exercise.name) { mutableStateOf("") }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 10.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp)
     ) {
-        // Шапка упражнения (тёмная)
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
                 .background(DarkGray, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(exercise.name, color = White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
         }
 
-        // Тело блока (белый фон)
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
                 .background(White, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
 
-            // Заголовок таблицы
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text("#", style = MaterialTheme.typography.labelSmall, color = DarkGray, modifier = Modifier.width(28.dp))
                 Text("прошлая тренировка", style = MaterialTheme.typography.labelSmall, color = DarkGray, modifier = Modifier.weight(1f))
@@ -218,19 +208,16 @@ private fun InlineExerciseBlock(
                 Spacer(Modifier.height(6.dp))
             }
 
-            // Строки подходов
             exercise.sets.forEachIndexed { index, set ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("${index + 1}", fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
-
                     Text(
                         text = viewModel.getPreviousSet(exercise.name, index)?.let { "${formatW(it.weight)} × ${it.reps}" } ?: "—",
                         color = DarkGray, fontSize = 14.sp, modifier = Modifier.weight(1f)
                     )
-
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         Text("${formatW(set.weight)} × ${set.reps}", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         if (viewModel.isExerciseRecord(exercise.name, set.weight, set.reps)) {
@@ -243,7 +230,6 @@ private fun InlineExerciseBlock(
 
             Spacer(Modifier.height(8.dp))
 
-            // Добавить подход
             if (!addingSet) {
                 Box(
                     modifier = Modifier.fillMaxWidth().height(44.dp).background(SoftGray, RoundedCornerShape(10.dp)),

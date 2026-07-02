@@ -6,18 +6,20 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.model.ExerciseLibrary
 import com.vkasport.app.data.model.MuscleGroup
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
+import com.vkasport.app.ui.theme.Gold
 import com.vkasport.app.ui.theme.SoftGray
 import com.vkasport.app.ui.theme.White
 
@@ -25,10 +27,14 @@ import com.vkasport.app.ui.theme.White
 fun ExerciseSelectionScreen(
     muscleGroup: MuscleGroup,
     alreadyAdded: List<String> = emptyList(),
+    customExercises: List<String> = emptyList(),
     onBack: () -> Unit,
+    onAddCustomExercise: (String) -> Unit,
     onExerciseSelected: (String) -> Unit
 ) {
-    val exercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
+    val libraryExercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
+    var addingCustom by remember(muscleGroup) { mutableStateOf(false) }
+    var customText by remember(muscleGroup) { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -41,26 +47,15 @@ fun ExerciseSelectionScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { onBack() },
+                    modifier = Modifier.size(40.dp).clickable { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("←", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(4.dp))
                 Column {
-                    Text(
-                        text = "ВЫБЕРИТЕ УПРАЖНЕНИЯ",
-                        color = White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp
-                    )
-                    Text(
-                        text = muscleGroup.title,
-                        color = White.copy(alpha = 0.6f),
-                        fontSize = 13.sp
-                    )
+                    Text("ВЫБЕРИТЕ УПРАЖНЕНИЯ", color = White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                    Text(muscleGroup.title, color = White.copy(alpha = 0.6f), fontSize = 13.sp)
                 }
             }
         }
@@ -71,13 +66,100 @@ fun ExerciseSelectionScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(exercises) { exercise ->
+            items(libraryExercises) { exercise ->
                 val isAdded = exercise.name in alreadyAdded
-                ExerciseListItem(
-                    name = exercise.name,
-                    isAdded = isAdded,
-                    onClick = { onExerciseSelected(exercise.name) }
-                )
+                ExerciseListItem(name = exercise.name, isAdded = isAdded, isCustom = false) {
+                    onExerciseSelected(exercise.name)
+                }
+            }
+
+            // ── Свои упражнения (если уже добавлялись раньше) ─────────
+            if (customExercises.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "СВОИ УПРАЖНЕНИЯ",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkGray,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                items(customExercises) { name ->
+                    val isAdded = name in alreadyAdded
+                    ExerciseListItem(name = name, isAdded = isAdded, isCustom = true) {
+                        onExerciseSelected(name)
+                    }
+                }
+            }
+
+            // ── Добавить своё упражнение ─────────────────────────────
+            item {
+                if (!addingCustom) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Black, RoundedCornerShape(12.dp))
+                            .clickable { addingCustom = true }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("+", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Добавить своё упражнение", color = White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SoftGray, RoundedCornerShape(12.dp))
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            "Название упражнения",
+                            fontSize = 12.sp,
+                            color = DarkGray,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = customText,
+                                onValueChange = { customText = it },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Black, unfocusedBorderColor = DarkGray.copy(alpha = 0.3f),
+                                    cursorColor = Black, focusedTextColor = Black, unfocusedTextColor = Black
+                                )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        if (customText.isNotBlank()) Black else DarkGray.copy(alpha = 0.3f),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable(enabled = customText.isNotBlank()) {
+                                        onAddCustomExercise(customText.trim())
+                                        customText = ""
+                                        addingCustom = false
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("✓", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Отмена",
+                            fontSize = 12.sp,
+                            color = DarkGray,
+                            modifier = Modifier.clickable { addingCustom = false; customText = "" }
+                        )
+                    }
+                }
             }
         }
     }
@@ -87,6 +169,7 @@ fun ExerciseSelectionScreen(
 private fun ExerciseListItem(
     name: String,
     isAdded: Boolean,
+    isCustom: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -101,12 +184,17 @@ private fun ExerciseListItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = name,
-            fontSize = 15.sp,
-            fontWeight = if (isAdded) FontWeight.Medium else FontWeight.Normal,
-            modifier = Modifier.weight(1f)
-        )
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = name,
+                fontSize = 15.sp,
+                fontWeight = if (isAdded) FontWeight.Medium else FontWeight.Normal
+            )
+            if (isCustom) {
+                Spacer(Modifier.width(6.dp))
+                Text("★", color = Gold, fontSize = 11.sp)
+            }
+        }
 
         Spacer(Modifier.width(12.dp))
 
@@ -114,16 +202,12 @@ private fun ExerciseListItem(
             Box(
                 modifier = Modifier.size(28.dp).background(Black, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
-            ) {
-                Text("✓", color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
+            ) { Text("✓", color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
         } else {
             Box(
                 modifier = Modifier.size(28.dp).background(SoftGray, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
-            ) {
-                Text("+", color = DarkGray, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-            }
+            ) { Text("+", color = DarkGray, fontSize = 18.sp, fontWeight = FontWeight.Medium) }
         }
     }
 }

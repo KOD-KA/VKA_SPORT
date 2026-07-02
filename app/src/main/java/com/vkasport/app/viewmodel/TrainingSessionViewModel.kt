@@ -21,23 +21,36 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     private val _completedWorkouts= MutableStateFlow<List<CompletedWorkout>>(emptyList())
     private val _exerciseHistory  = MutableStateFlow<Map<String, ExerciseHistory>>(emptyMap())
     private val _plannedWorkouts  = MutableStateFlow<List<PlannedWorkout>>(emptyList())
+    private val _customExercises  = MutableStateFlow<List<CustomExercise>>(emptyList())
 
     val state: StateFlow<CurrentWorkoutState>     = _state
     val completedWorkouts = _completedWorkouts.asStateFlow()
     val exerciseHistory   = _exerciseHistory.asStateFlow()
     val plannedWorkouts   = _plannedWorkouts.asStateFlow()
+    val customExercises   = _customExercises.asStateFlow()
 
     // ==================== WORKOUT ACTIONS ====================
 
     fun selectMuscleGroup(group: MuscleGroup) { _state.value = _state.value.copy(selectedMuscleGroup = group) }
 
-    // Упражнение всегда привязывается к группе мышц, выбранной прямо сейчас
-    // (state.selectedMuscleGroup) — это позволяет добавлять упражнения
-    // из РАЗНЫХ групп мышц в одну тренировку.
     fun addExercise(name: String) {
         val group = _state.value.selectedMuscleGroup ?: return
         val exercise = WorkoutExercise(name = name, muscleGroup = group)
         _state.value = _state.value.copy(selectedExercises = _state.value.selectedExercises + exercise)
+    }
+
+    // Убрать упражнение из текущей тренировки (ещё не сохранённой)
+    fun removeExercise(name: String) {
+        _state.value = _state.value.copy(
+            selectedExercises = _state.value.selectedExercises.filterNot { it.name == name }
+        )
+    }
+
+    // Убрать целую группу мышц (и все её упражнения) из текущей тренировки
+    fun removeMuscleGroup(group: MuscleGroup) {
+        _state.value = _state.value.copy(
+            selectedExercises = _state.value.selectedExercises.filterNot { it.muscleGroup == group }
+        )
     }
 
     fun updateAthleteWeight(w: Float) { _state.value = _state.value.copy(athleteWeight = w) }
@@ -58,13 +71,39 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         loadRecordsFromDatabase()
     }
 
+    // ==================== ПОВТОР ГРУППЫ ИЗ ПРОШЛОЙ ТРЕНИРОВКИ ====================
+
+    // Добавляет в текущую тренировку упражнения указанной группы мышц из
+    // последней тренировки, где эта группа встречалась (без подходов —
+    // только состав упражнений, шаблон).
+    fun repeatLastMuscleGroup(group: MuscleGroup) {
+        val lastWithGroup = _completedWorkouts.value.asReversed()
+            .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
+            ?: return
+
+        val alreadyAdded = _state.value.selectedExercises.map { it.name }.toSet()
+        val toAdd = lastWithGroup.exercises
+            .filter { it.muscleGroup == group && it.name !in alreadyAdded }
+            .map { WorkoutExercise(name = it.name, muscleGroup = group) }
+
+        if (toAdd.isEmpty()) return
+
+        _state.value = _state.value.copy(selectedExercises = _state.value.selectedExercises + toAdd)
+    }
+
+    // Список групп мышц, которые встречались в предыдущих тренировках —
+    // используется чтобы предложить пользователю, что можно повторить
+    fun getRepeatableMuscleGroups(): List<MuscleGroup> {
+        return _completedWorkouts.value
+            .flatMap { it.exercises.mapNotNull { ex -> ex.muscleGroup } }
+            .distinct()
+    }
+
     // ==================== FINISH WORKOUT ====================
 
     fun finishCurrentWorkout() {
         val s = _state.value
 
-        // Тренировка может включать несколько групп мышц —
-        // собираем все уникальные группы, использованные в сессии
         val usedGroups = s.selectedExercises.mapNotNull { it.muscleGroup }.distinct()
         val muscleGroupSummary =
             if (usedGroups.isNotEmpty()) usedGroups.joinToString(", ") { it.title }
@@ -185,6 +224,34 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
             database.plannedWorkoutDao().deleteExercisesByWorkout(id)
             database.plannedWorkoutDao().deleteById(id)
             loadPlannedWorkouts()
+        }
+    }
+
+    // ==================== СВОИ УПРАЖНЕНИЯ ====================
+
+    fun loadCustomExercises() {
+        viewModelScope.launch {
+            _customExercises.value = database.customExerciseDao().getAll().mapNotNull { e ->
+                val group = MuscleGroup.entries.find { it.name == e.muscleGroup } ?: return@mapNotNull null
+                CustomExercise(id = e.id, name = e.name, muscleGroup = group)
+            }
+        }
+    }
+
+    fun addCustomExercise(name: String, group: MuscleGroup) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        val alreadyExists = _customExercises.value.any {
+            it.muscleGroup == group && it.name.equals(trimmed, ignoreCase = true)
+        }
+        val existsInLibrary = ExerciseLibrary.exercises.any {
+            it.muscleGroup == group && it.name.equals(trimmed, ignoreCase = true)
+        }
+        if (alreadyExists || existsInLibrary) return
+
+        viewModelScope.launch {
+            database.customExerciseDao().insert(CustomExerciseEntity(name = trimmed, muscleGroup = group.name))
+            loadCustomExercises()
         }
     }
 

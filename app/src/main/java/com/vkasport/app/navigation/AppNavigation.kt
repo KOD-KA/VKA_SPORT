@@ -34,6 +34,7 @@ fun AppNavigation(
     LaunchedEffect(trainingViewModel) {
         trainingViewModel.loadArchiveFromDatabase()
         trainingViewModel.loadRecordsFromDatabase()
+        trainingViewModel.loadCustomExercises()
     }
 
     NavHost(
