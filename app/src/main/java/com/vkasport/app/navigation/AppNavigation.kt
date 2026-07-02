@@ -1,6 +1,7 @@
 package com.vkasport.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -24,12 +25,16 @@ fun AppNavigation(
     val context = LocalContext.current
 
     val database = remember { AppDatabaseProvider.getDatabase(context) }
-
     val trainingViewModel = remember { TrainingSessionViewModel(database) }
-        .also {
-            it.loadArchiveFromDatabase()
-            it.loadRecordsFromDatabase()
-        }
+
+    // Загружаем данные один раз при создании ViewModel, а не при
+    // каждой рекомпозиции AppNavigation (раньше .also{} внутри remember
+    // вызывался на каждый ре-рендер, порождая лишние запросы к БД —
+    // одна из причин "моргания" при частых нажатиях).
+    LaunchedEffect(trainingViewModel) {
+        trainingViewModel.loadArchiveFromDatabase()
+        trainingViewModel.loadRecordsFromDatabase()
+    }
 
     NavHost(
         navController  = navController,
@@ -42,8 +47,13 @@ fun AppNavigation(
         }
 
         composable(Screen.Records.route) {
-            trainingViewModel.loadArchiveFromDatabase()
-            trainingViewModel.loadRecordsFromDatabase()
+            // Обновляем данные при каждом заходе на вкладку (например,
+            // после завершения тренировки), но только один раз за вход,
+            // а не на каждую рекомпозицию.
+            LaunchedEffect(Unit) {
+                trainingViewModel.loadArchiveFromDatabase()
+                trainingViewModel.loadRecordsFromDatabase()
+            }
             WorkoutArchiveScreen(viewModel = trainingViewModel)
         }
 

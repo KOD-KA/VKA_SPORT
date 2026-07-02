@@ -1,7 +1,5 @@
 package com.vkasport.app.data.model
 
-
-
 enum class MuscleGroup(
     val title: String
 ) {
@@ -10,5 +8,9 @@ enum class MuscleGroup(
     LEGS("Ноги"),
     SHOULDERS("Плечи"),
     BICEPS("Бицепс"),
-    TRICEPS("Трицепс")
+    TRICEPS("Трицепс"),
+    ABS("Пресс"),
+    FOREARMS("Предплечья"),
+    NECK("Шея"),
+    STRETCH("Растяжка")
 }

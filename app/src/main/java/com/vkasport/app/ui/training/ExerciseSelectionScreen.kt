@@ -25,31 +25,44 @@ import com.vkasport.app.ui.theme.White
 fun ExerciseSelectionScreen(
     muscleGroup: MuscleGroup,
     alreadyAdded: List<String> = emptyList(),
+    onBack: () -> Unit,
     onExerciseSelected: (String) -> Unit
 ) {
     val exercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // ===== ШАПКА =====
+        // ===== ШАПКА С КНОПКОЙ НАЗАД =====
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Black)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = 8.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = "ВЫБЕРИТЕ УПРАЖНЕНИЯ",
-                color = White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = muscleGroup.title,
-                color = White.copy(alpha = 0.6f),
-                fontSize = 13.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("←", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(4.dp))
+                Column {
+                    Text(
+                        text = "ВЫБЕРИТЕ УПРАЖНЕНИЯ",
+                        color = White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp
+                    )
+                    Text(
+                        text = muscleGroup.title,
+                        color = White.copy(alpha = 0.6f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
         }
 
         // ===== СПИСОК УПРАЖНЕНИЙ =====
@@ -98,34 +111,18 @@ private fun ExerciseListItem(
         Spacer(Modifier.width(12.dp))
 
         if (isAdded) {
-            // Уже добавлено — зелёная галочка
             Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .background(Black, RoundedCornerShape(8.dp)),
+                modifier = Modifier.size(28.dp).background(Black, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "✓",
-                    color = White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("✓", color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         } else {
-            // Добавить
             Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .background(SoftGray, RoundedCornerShape(8.dp)),
+                modifier = Modifier.size(28.dp).background(SoftGray, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "+",
-                    color = DarkGray,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Text("+", color = DarkGray, fontSize = 18.sp, fontWeight = FontWeight.Medium)
             }
         }
     }

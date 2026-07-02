@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.ui.theme.Black
+import com.vkasport.app.ui.theme.SystemBarsAppearance
 import com.vkasport.app.ui.theme.White
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 
@@ -24,6 +25,14 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
     val state by viewModel.state.collectAsState()
     val completedWorkouts by viewModel.completedWorkouts.collectAsState()
     val currentScreen = state.currentScreen
+
+    // ── Цвет статус-бара синхронизирован с фоном текущего под-экрана ──
+    val (barColor, darkIcons) = when (currentScreen) {
+        "start", "weight", "summary" -> Black to false
+        "muscles"                    -> White to true
+        else                         -> Black to false // exercises, training
+    }
+    SystemBarsAppearance(statusBarColor = barColor, darkIcons = darkIcons)
 
     // Вес из последней тренировки — для пре-заполнения поля
     val lastWeight = completedWorkouts.lastOrNull()?.athleteWeight
@@ -44,6 +53,10 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
             var weightText by remember(lastWeight) {
                 mutableStateOf(lastWeight?.let { "%.1f".format(it) } ?: "")
             }
+
+            // Живая разница с прошлым весом — считается по мере ввода
+            val liveWeight = weightText.replace(",", ".").toFloatOrNull()
+            val liveDiff = if (liveWeight != null && lastWeight != null) liveWeight - lastWeight else null
 
             Column(
                 modifier = Modifier
@@ -88,6 +101,23 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                     singleLine = true
                 )
 
+                // ── Индикатор изменения веса: зелёный/красный ──────────
+                if (liveDiff != null) {
+                    Spacer(Modifier.height(10.dp))
+                    val diffColor = when {
+                        liveDiff > 0f -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // зелёный
+                        liveDiff < 0f -> androidx.compose.ui.graphics.Color(0xFFE53935) // красный
+                        else -> White.copy(alpha = 0.6f)
+                    }
+                    val sign = if (liveDiff >= 0f) "+" else ""
+                    Text(
+                        text = "$sign%.1f кг".format(liveDiff),
+                        color = diffColor,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Spacer(Modifier.height(28.dp))
 
                 Box(
@@ -96,20 +126,13 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                         .widthIn(min = 180.dp, max = 260.dp)
                         .background(White, RoundedCornerShape(12.dp))
                         .clickable {
-                            weightText.replace(",", ".").toFloatOrNull()?.let { w ->
-                                viewModel.updateAthleteWeight(w)
-                            }
+                            liveWeight?.let { w -> viewModel.updateAthleteWeight(w) }
                             viewModel.setCurrentScreen("muscles")
                         }
                         .padding(horizontal = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "ДАЛЕЕ →",
-                        color = Black,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("ДАЛЕЕ →", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -119,6 +142,17 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         // нажимает "Добавить группу мышц" на экране тренировки
         "muscles" -> {
             MuscleGroupScreen(
+                onBack = {
+                    // Если ещё ни одного упражнения не добавлено — это самый
+                    // первый выбор группы, возвращаемся к вводу веса.
+                    // Иначе — пользователь просто передумал добавлять
+                    // ещё одну группу, возвращаемся к тренировке.
+                    if (state.selectedExercises.isEmpty()) {
+                        viewModel.setCurrentScreen("weight")
+                    } else {
+                        viewModel.setCurrentScreen("training")
+                    }
+                },
                 onGroupSelected = {
                     viewModel.selectMuscleGroup(it)
                     viewModel.setCurrentScreen("exercises")
@@ -127,15 +161,13 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         }
 
         // ================= УПРАЖНЕНИЯ =================
-        // Список фильтруется по state.selectedMuscleGroup — эта группа
-        // устанавливается либо на экране "muscles", либо напрямую при
-        // нажатии "+" внутри уже существующей группы на экране тренировки
         "exercises" -> {
             val group = state.selectedMuscleGroup
             group?.let {
                 ExerciseSelectionScreen(
                     muscleGroup = it,
                     alreadyAdded = state.selectedExercises.map { ex -> ex.name },
+                    onBack = { viewModel.setCurrentScreen("muscles") },
                     onExerciseSelected = { ex ->
                         viewModel.addExercise(ex)
                         viewModel.setCurrentScreen("training")
@@ -145,8 +177,6 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         }
 
         // ================= ТРЕНИРОВКА =================
-        // Упражнения сгруппированы по группам мышц; можно добавить ещё
-        // упражнение в существующую группу или добавить новую группу целиком
         "training" -> {
             TrainingScreen(
                 viewModel = viewModel,

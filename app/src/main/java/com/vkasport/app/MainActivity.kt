@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import com.vkasport.app.data.local.database.AppDatabaseProvider
 import com.vkasport.app.data.repository.WorkoutRepository
 import com.vkasport.app.ui.main.MainScreen
+import com.vkasport.app.ui.theme.VKASPORTTheme
 import com.vkasport.app.viewmodel.WorkoutViewModel
 
 class MainActivity : ComponentActivity() {
@@ -26,9 +27,11 @@ class MainActivity : ComponentActivity() {
             )
 
         setContent {
-            MainScreen(
-                viewModel = viewModel
-            )
+            VKASPORTTheme {
+                MainScreen(
+                    viewModel = viewModel
+                )
+            }
         }
     }
 }
