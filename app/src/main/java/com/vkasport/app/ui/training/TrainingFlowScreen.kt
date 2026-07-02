@@ -132,11 +132,20 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
         "exercises" -> {
             val group = state.selectedMuscleGroup
             group?.let { g ->
+                val lastGroupExercises = remember(g, completedWorkouts) {
+                    viewModel.getLastMuscleGroupExercises(g)
+                        .filter { it !in state.selectedExercises.map { ex -> ex.name } }
+                }
                 ExerciseSelectionScreen(
                     muscleGroup = g,
                     alreadyAdded = state.selectedExercises.map { ex -> ex.name },
                     customExercises = customExercises.filter { it.muscleGroup == g }.map { it.name },
+                    lastGroupExercises = lastGroupExercises,
                     onBack = { viewModel.setCurrentScreen("muscles") },
+                    onRepeatLastGroup = {
+                        viewModel.repeatLastMuscleGroup(g)
+                        viewModel.setCurrentScreen("training")
+                    },
                     onExerciseSelected = { ex ->
                         viewModel.addExercise(ex)
                         viewModel.setCurrentScreen("training")

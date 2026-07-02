@@ -28,7 +28,9 @@ fun ExerciseSelectionScreen(
     muscleGroup: MuscleGroup,
     alreadyAdded: List<String> = emptyList(),
     customExercises: List<String> = emptyList(),
+    lastGroupExercises: List<String> = emptyList(),
     onBack: () -> Unit,
+    onRepeatLastGroup: () -> Unit,
     onAddCustomExercise: (String) -> Unit,
     onExerciseSelected: (String) -> Unit
 ) {
@@ -40,10 +42,7 @@ fun ExerciseSelectionScreen(
 
         // ===== ШАПКА С КНОПКОЙ НАЗАД =====
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Black)
-                .padding(horizontal = 8.dp, vertical = 10.dp)
+            modifier = Modifier.fillMaxWidth().background(Black).padding(horizontal = 8.dp, vertical = 10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -66,6 +65,50 @@ fun ExerciseSelectionScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+
+            // ── Повторить как в прошлый раз ────────────────────────────
+            if (lastGroupExercises.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SoftGray, RoundedCornerShape(14.dp))
+                            .clickable { onRepeatLastGroup() }
+                            .padding(14.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("↻", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Повторить как в прошлый раз",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = lastGroupExercises.joinToString(", "),
+                            fontSize = 12.sp,
+                            color = DarkGray
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(Black, RoundedCornerShape(10.dp))
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                "Добавить все (${lastGroupExercises.size}) →",
+                                color = White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(2.dp)) }
+            }
+
             items(libraryExercises) { exercise ->
                 val isAdded = exercise.name in alreadyAdded
                 ExerciseListItem(name = exercise.name, isAdded = isAdded, isCustom = false) {
@@ -73,7 +116,7 @@ fun ExerciseSelectionScreen(
                 }
             }
 
-            // ── Свои упражнения (если уже добавлялись раньше) ─────────
+            // ── Свои упражнения ──────────────────────────────────────
             if (customExercises.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(4.dp))
@@ -110,17 +153,9 @@ fun ExerciseSelectionScreen(
                     }
                 } else {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(SoftGray, RoundedCornerShape(12.dp))
-                            .padding(14.dp)
+                        modifier = Modifier.fillMaxWidth().background(SoftGray, RoundedCornerShape(12.dp)).padding(14.dp)
                     ) {
-                        Text(
-                            "Название упражнения",
-                            fontSize = 12.sp,
-                            color = DarkGray,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text("Название упражнения", fontSize = 12.sp, color = DarkGray, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
@@ -153,9 +188,7 @@ fun ExerciseSelectionScreen(
                         }
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Отмена",
-                            fontSize = 12.sp,
-                            color = DarkGray,
+                            "Отмена", fontSize = 12.sp, color = DarkGray,
                             modifier = Modifier.clickable { addingCustom = false; customText = "" }
                         )
                     }
@@ -175,21 +208,14 @@ private fun ExerciseListItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                color = if (isAdded) SoftGray else White,
-                shape = RoundedCornerShape(12.dp)
-            )
+            .background(color = if (isAdded) SoftGray else White, shape = RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = name,
-                fontSize = 15.sp,
-                fontWeight = if (isAdded) FontWeight.Medium else FontWeight.Normal
-            )
+            Text(text = name, fontSize = 15.sp, fontWeight = if (isAdded) FontWeight.Medium else FontWeight.Normal)
             if (isCustom) {
                 Spacer(Modifier.width(6.dp))
                 Text("★", color = Gold, fontSize = 11.sp)

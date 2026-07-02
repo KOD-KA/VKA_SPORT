@@ -10,5 +10,10 @@ data class CompletedWorkoutExerciseEntity(
 
     val workoutId: Long,
 
-    val exerciseName: String
+    val exerciseName: String,
+
+    // Группа мышц, к которой относилось упражнение (MuscleGroup.name).
+    // Нужно для восстановления группировки после перезапуска приложения
+    // и для функции "повторить группу из прошлой тренировки".
+    val muscleGroup: String? = null
 )

@@ -42,6 +42,10 @@ fun TrainingScreen(
     val fmt = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
     val weightDiff = viewModel.getWeightDifference()
 
+    // Диалоги подтверждения удаления
+    var confirmRemoveGroup by remember { mutableStateOf<MuscleGroup?>(null) }
+    var confirmRemoveExercise by remember { mutableStateOf<String?>(null) }
+
     val groupedExercises: Map<MuscleGroup, List<WorkoutExercise>> = remember(state.selectedExercises) {
         state.selectedExercises
             .filter { it.muscleGroup != null }
@@ -56,36 +60,21 @@ fun TrainingScreen(
 
         // ===== ШАПКА =====
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Black)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier.fillMaxWidth().background(Black).padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Text(headerTitle, color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "начало: ${state.workoutStartTime.format(fmt)}",
-                    color = White.copy(alpha = 0.65f), fontSize = 12.sp
-                )
+                Text("начало: ${state.workoutStartTime.format(fmt)}", color = White.copy(alpha = 0.65f), fontSize = 12.sp)
 
-                // ── Вес + цветной индикатор изменения (зелёный/красный) ──
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = state.athleteWeight?.let { "%.1f".format(it) } ?: "—",
-                        color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium
-                    )
+                    Text(state.athleteWeight?.let { "%.1f".format(it) } ?: "—", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     Text(" кг", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     if (weightDiff != null && weightDiff != 0f) {
                         Spacer(Modifier.width(4.dp))
                         val diffColor = if (weightDiff > 0f) GreenColor else RedColor
                         val sign = if (weightDiff > 0f) "+" else ""
-                        Text(
-                            text = "($sign%.1f)".format(weightDiff),
-                            color = diffColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("($sign%.1f)".format(weightDiff), color = diffColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -98,6 +87,7 @@ fun TrainingScreen(
         ) {
             groupedExercises.forEach { (group, exercises) ->
 
+                // Заголовок группы мышц с кнопкой удаления группы (✕)
                 item(key = "group_${group.name}") {
                     Box(
                         modifier = Modifier
@@ -105,17 +95,36 @@ fun TrainingScreen(
                             .padding(horizontal = 16.dp)
                             .padding(top = 14.dp)
                             .background(Black, RoundedCornerShape(12.dp))
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(vertical = 12.dp)
                     ) {
-                        Text(group.title.uppercase(), color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(
+                            group.title.uppercase(),
+                            color = White, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 4.dp)
+                                .size(26.dp)
+                                .clickable { confirmRemoveGroup = group },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("✕", color = White.copy(alpha = 0.8f), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
+                // Упражнения этой группы
                 items(exercises, key = { "ex_${it.name}" }) { exercise ->
-                    InlineExerciseBlock(exercise = exercise, viewModel = viewModel)
+                    InlineExerciseBlock(
+                        exercise = exercise,
+                        viewModel = viewModel,
+                        onRemove = { confirmRemoveExercise = exercise.name }
+                    )
                 }
 
+                // Кнопка "+" добавить ещё упражнение в эту же группу
                 item(key = "add_ex_${group.name}") {
                     Box(
                         modifier = Modifier
@@ -132,6 +141,7 @@ fun TrainingScreen(
                 }
             }
 
+            // Кнопка "+" добавить ещё одну группу мышц
             item(key = "add_group") {
                 Box(
                     modifier = Modifier
@@ -168,12 +178,55 @@ fun TrainingScreen(
             }
         }
     }
+
+    // ===== ДИАЛОГ: УДАЛИТЬ ГРУППУ МЫШЦ =====
+    confirmRemoveGroup?.let { group ->
+        AlertDialog(
+            onDismissRequest = { confirmRemoveGroup = null },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            title = { Text("Убрать группу «${group.title}»?", fontWeight = FontWeight.Bold) },
+            text = { Text("Все упражнения и подходы этой группы в текущей тренировке будут удалены. Это действие нельзя отменить.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.removeMuscleGroup(group)
+                    confirmRemoveGroup = null
+                }) { Text("Убрать", color = RedColor, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoveGroup = null }) { Text("Отмена", color = DarkGray) }
+            }
+        )
+    }
+
+    // ===== ДИАЛОГ: УДАЛИТЬ УПРАЖНЕНИЕ =====
+    confirmRemoveExercise?.let { name ->
+        AlertDialog(
+            onDismissRequest = { confirmRemoveExercise = null },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            title = { Text("Убрать упражнение?", fontWeight = FontWeight.Bold) },
+            text = { Text("«$name» и все его подходы будут удалены из текущей тренировки.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.removeExercise(name)
+                    confirmRemoveExercise = null
+                }) { Text("Убрать", color = RedColor, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoveExercise = null }) { Text("Отмена", color = DarkGray) }
+            }
+        )
+    }
 }
 
 @Composable
 private fun InlineExerciseBlock(
     exercise: WorkoutExercise,
-    viewModel: TrainingSessionViewModel
+    viewModel: TrainingSessionViewModel,
+    onRemove: () -> Unit
 ) {
     var addingSet by remember(exercise.name) { mutableStateOf(false) }
     var weightInput by remember(exercise.name) { mutableStateOf("") }
@@ -182,12 +235,26 @@ private fun InlineExerciseBlock(
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp)
     ) {
+        // Шапка упражнения с кнопкой удаления (✕)
         Box(
             modifier = Modifier.fillMaxWidth()
                 .background(DarkGray, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(exercise.name, color = White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(
+                exercise.name,
+                color = White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
+                modifier = Modifier.align(Alignment.CenterStart).padding(end = 30.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .size(24.dp)
+                    .clickable { onRemove() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✕", color = White.copy(alpha = 0.8f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
 
         Column(

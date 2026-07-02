@@ -18,7 +18,7 @@ import com.vkasport.app.data.local.entity.*
         PlannedExerciseEntity::class,
         CustomExerciseEntity::class
     ],
-    version = 12,          // 11 -> 12: добавлена таблица custom_exercises
+    version = 13,          // 12 -> 13: добавлена колонка muscleGroup в completed_workout_exercises
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {

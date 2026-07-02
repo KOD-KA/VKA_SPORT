@@ -39,7 +39,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         _state.value = _state.value.copy(selectedExercises = _state.value.selectedExercises + exercise)
     }
 
-    // Убрать упражнение из текущей тренировки (ещё не сохранённой)
+    // Убрать упражнение из текущей (ещё не сохранённой) тренировки
     fun removeExercise(name: String) {
         _state.value = _state.value.copy(
             selectedExercises = _state.value.selectedExercises.filterNot { it.name == name }
@@ -73,9 +73,18 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     // ==================== ПОВТОР ГРУППЫ ИЗ ПРОШЛОЙ ТРЕНИРОВКИ ====================
 
+    // Названия упражнений указанной группы из последней тренировки, где
+    // эта группа встречалась. Только для предпросмотра — ничего не меняет.
+    fun getLastMuscleGroupExercises(group: MuscleGroup): List<String> {
+        val last = _completedWorkouts.value.asReversed()
+            .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
+            ?: return emptyList()
+        return last.exercises.filter { it.muscleGroup == group }.map { it.name }
+    }
+
     // Добавляет в текущую тренировку упражнения указанной группы мышц из
     // последней тренировки, где эта группа встречалась (без подходов —
-    // только состав упражнений, шаблон).
+    // только состав упражнений, как шаблон).
     fun repeatLastMuscleGroup(group: MuscleGroup) {
         val lastWithGroup = _completedWorkouts.value.asReversed()
             .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
@@ -87,16 +96,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
             .map { WorkoutExercise(name = it.name, muscleGroup = group) }
 
         if (toAdd.isEmpty()) return
-
         _state.value = _state.value.copy(selectedExercises = _state.value.selectedExercises + toAdd)
-    }
-
-    // Список групп мышц, которые встречались в предыдущих тренировках —
-    // используется чтобы предложить пользователю, что можно повторить
-    fun getRepeatableMuscleGroups(): List<MuscleGroup> {
-        return _completedWorkouts.value
-            .flatMap { it.exercises.mapNotNull { ex -> ex.muscleGroup } }
-            .distinct()
     }
 
     // ==================== FINISH WORKOUT ====================
@@ -119,7 +119,16 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 )
             )
             s.selectedExercises.forEach { ex ->
-                database.completedWorkoutExerciseDao().insert(CompletedWorkoutExerciseEntity(workoutId = wid, exerciseName = ex.name))
+                database.completedWorkoutExerciseDao().insert(
+                    CompletedWorkoutExerciseEntity(
+                        workoutId = wid,
+                        exerciseName = ex.name,
+                        // Сохраняем группу мышц упражнения, чтобы "повтор
+                        // группы" и группировка в архиве работали и после
+                        // перезапуска приложения
+                        muscleGroup = ex.muscleGroup?.name
+                    )
+                )
                 ex.sets.forEach { set -> database.completedWorkoutSetDao().insert(CompletedWorkoutSetEntity(workoutId = wid, exerciseName = ex.name, weight = set.weight, reps = set.reps)) }
             }
         }
@@ -176,8 +185,12 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                     athleteWeight = e.athleteWeight, muscleGroup = e.muscleGroup,
                     durationMinutes = e.duration ?: 0,
                     exercises = exEntities.map { ex ->
-                        WorkoutExercise(name = ex.exerciseName,
-                            sets = (allSets[ex.exerciseName] ?: emptyList()).map { WorkoutSet(it.weight, it.reps) })
+                        WorkoutExercise(
+                            name = ex.exerciseName,
+                            // Восстанавливаем группу мышц из сохранённой строки
+                            muscleGroup = ex.muscleGroup?.let { name -> MuscleGroup.entries.find { it.name == name } },
+                            sets = (allSets[ex.exerciseName] ?: emptyList()).map { WorkoutSet(it.weight, it.reps) }
+                        )
                     }
                 )
             }
