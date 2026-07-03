@@ -362,13 +362,13 @@ private fun QuickPlanSheet(
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(hourStr, { hourStr = it.filter(Char::isDigit).take(2) },
-                label = { Text("Час") }, modifier = Modifier.width(90.dp), singleLine = true,
+                label = { Text("Час", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                     focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
-            Text(":", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(":", color = Black, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             OutlinedTextField(minStr, { minStr = it.filter(Char::isDigit).take(2) },
-                label = { Text("Мин") }, modifier = Modifier.width(90.dp), singleLine = true,
+                label = { Text("Мин", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                     focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))

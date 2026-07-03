@@ -296,7 +296,7 @@ private fun ArchiveCard(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("%.1f кг".format(workout.athleteWeight ?: 0f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("%.1f кг".format(workout.athleteWeight ?: 0f), color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 if (recordCount > 0) {
                     Row(
                         modifier = Modifier
@@ -382,9 +382,9 @@ private fun WorkoutDetailSheet(workout: CompletedWorkout) {
                         exercise.sets.forEachIndexed { idx, set ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Text("${idx + 1}", Modifier.width(28.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text("${fmtW(set.weight)} кг", Modifier.weight(1f), fontSize = 14.sp)
-                                Text("× ${set.reps}", Modifier.weight(1f), fontSize = 14.sp)
+                                Text("${idx + 1}", Modifier.width(28.dp), color = Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("${fmtW(set.weight)} кг", Modifier.weight(1f), color = Black, fontSize = 14.sp)
+                                Text("× ${set.reps}", Modifier.weight(1f), color = Black, fontSize = 14.sp)
                                 Text("${(set.weight * set.reps).toInt()} кг", Modifier.weight(1f), fontSize = 13.sp, color = DarkGray)
                             }
                             if (idx < exercise.sets.lastIndex)

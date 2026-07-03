@@ -77,10 +77,11 @@ fun ExerciseSelectionScreen(
                             .padding(14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("↻", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("↻", color = Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 "Повторить как в прошлый раз",
+                                color = Black,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -215,7 +216,7 @@ private fun ExerciseListItem(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = name, fontSize = 15.sp, fontWeight = if (isAdded) FontWeight.Medium else FontWeight.Normal)
+            Text(text = name, color = Black, fontSize = 15.sp, fontWeight = if (isAdded) FontWeight.Medium else FontWeight.Normal)
             if (isCustom) {
                 Spacer(Modifier.width(6.dp))
                 Text("★", color = Gold, fontSize = 11.sp)

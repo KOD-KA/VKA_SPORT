@@ -467,13 +467,13 @@ private fun AddPlannedWorkoutSheet(
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(hourStr, { hourStr = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Час") }, modifier = Modifier.width(90.dp), singleLine = true,
+                        label = { Text("Час", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                             focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
-                    Text(":", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(":", color = Black, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     OutlinedTextField(minStr, { minStr = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Мин") }, modifier = Modifier.width(90.dp), singleLine = true,
+                        label = { Text("Мин", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                             focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
@@ -588,9 +588,9 @@ private fun WorkoutDetailSheet(workout: CompletedWorkout) {
                     Spacer(Modifier.height(4.dp)); HorizontalDivider(color = LightGray); Spacer(Modifier.height(4.dp))
                     ex.sets.forEachIndexed { idx, set ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${idx+1}", Modifier.width(28.dp), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("${fmtW(set.weight)} кг", Modifier.weight(1f), fontSize = 14.sp)
-                            Text("× ${set.reps}", Modifier.weight(1f), fontSize = 14.sp)
+                            Text("${idx+1}", Modifier.width(28.dp), color = Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("${fmtW(set.weight)} кг", Modifier.weight(1f), color = Black, fontSize = 14.sp)
+                            Text("× ${set.reps}", Modifier.weight(1f), color = Black, fontSize = 14.sp)
                             Text("${(set.weight*set.reps).toInt()} кг", Modifier.weight(1f), fontSize = 13.sp, color = DarkGray)
                         }
                         if (idx < ex.sets.lastIndex) HorizontalDivider(color = SoftGray, thickness = .5.dp)

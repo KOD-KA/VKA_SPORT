@@ -32,8 +32,12 @@ val Gold =
 // LIGHT THEME
 
 
+// ИСПРАВЛЕНО: раньше BackgroundLight = SoftGray — тот же цвет, что и у
+// самих карточек (см. RecordCard/ArchiveCard), из-за чего карточки
+// визуально сливались с общим фоном экрана. По дизайну (PDF-макет)
+// страница должна быть белой, а карточки — светло-серыми поверх неё.
 val BackgroundLight =
-    SoftGray
+    White
 
 
 val SurfaceLight =
@@ -74,4 +78,3 @@ val TextPrimaryDark =
 
 val CardDark =
     DarkGray
-

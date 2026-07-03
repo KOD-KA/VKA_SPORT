@@ -39,8 +39,16 @@ fun TrainingScreen(
     onFinishWorkout: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
+    val completedWorkouts by viewModel.completedWorkouts.collectAsState()
     val fmt = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
-    val weightDiff = viewModel.getWeightDifference()
+
+    // ИСПРАВЛЕНО: сравниваем ВВЕДЁННЫЙ СЕГОДНЯ вес (state.athleteWeight)
+    // с весом из ПОСЛЕДНЕЙ завершённой тренировки — а не два прошлых
+    // значения между собой (как было раньше через getWeightDifference()).
+    val lastWeight = completedWorkouts.lastOrNull()?.athleteWeight
+    val weightDiff = if (lastWeight != null && state.athleteWeight != null)
+        state.athleteWeight!! - lastWeight
+    else null
 
     // Диалоги подтверждения удаления
     var confirmRemoveGroup by remember { mutableStateOf<MuscleGroup?>(null) }
@@ -70,9 +78,13 @@ fun TrainingScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(state.athleteWeight?.let { "%.1f".format(it) } ?: "—", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     Text(" кг", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    if (weightDiff != null && weightDiff != 0f) {
+                    if (weightDiff != null) {
                         Spacer(Modifier.width(4.dp))
-                        val diffColor = if (weightDiff > 0f) GreenColor else RedColor
+                        val diffColor = when {
+                            weightDiff > 0f -> GreenColor
+                            weightDiff < 0f -> RedColor
+                            else -> White
+                        }
                         val sign = if (weightDiff > 0f) "+" else ""
                         Text("($sign%.1f)".format(weightDiff), color = diffColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
@@ -280,13 +292,13 @@ private fun InlineExerciseBlock(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("${index + 1}", fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
+                    Text("${index + 1}", color = Black, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
                     Text(
                         text = viewModel.getPreviousSet(exercise.name, index)?.let { "${formatW(it.weight)} × ${it.reps}" } ?: "—",
                         color = DarkGray, fontSize = 14.sp, modifier = Modifier.weight(1f)
                     )
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${formatW(set.weight)} × ${set.reps}", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("${formatW(set.weight)} × ${set.reps}", color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         if (viewModel.isExerciseRecord(exercise.name, set.weight, set.reps)) {
                             Spacer(Modifier.width(4.dp))
                             Text("🏆", fontSize = 11.sp)
@@ -314,7 +326,7 @@ private fun InlineExerciseBlock(
                 ) {
                     OutlinedTextField(
                         value = weightInput, onValueChange = { weightInput = it },
-                        label = { Text("кг") }, modifier = Modifier.weight(1f),
+                        label = { Text("кг", color = DarkGray) }, modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,
@@ -323,7 +335,7 @@ private fun InlineExerciseBlock(
                     )
                     OutlinedTextField(
                         value = repsInput, onValueChange = { repsInput = it },
-                        label = { Text("повт.") }, modifier = Modifier.weight(1f),
+                        label = { Text("повт.", color = DarkGray) }, modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,

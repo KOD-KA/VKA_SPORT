@@ -196,7 +196,7 @@ private fun MetricRow(
 
             // Большое число + подпись
             Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
-                Text(bigValue, fontSize = 36.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp)
+                Text(bigValue, color = Black, fontSize = 36.sp, fontWeight = FontWeight.Bold, lineHeight = 38.sp)
                 Spacer(Modifier.width(6.dp))
                 Text(subValue, fontSize = 14.sp, color = DarkGray, modifier = Modifier.padding(bottom = 4.dp))
             }
