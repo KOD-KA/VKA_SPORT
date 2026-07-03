@@ -12,7 +12,9 @@ sealed class BottomNavItem(
 
     object Training : BottomNavItem("training", "Тренировка", Icons.Default.FitnessCenter)
 
-    object Records : BottomNavItem("records", "Рекорды", Icons.Default.Star)
+    // Заменено на EmojiEvents (кубок) — соответствует иконографии
+    // рекордов, используемой во всём остальном приложении (🏆)
+    object Records : BottomNavItem("records", "Рекорды", Icons.Default.EmojiEvents)
 
     object Calendar : BottomNavItem("calendar", "Календарь", Icons.Default.CalendarMonth)
 
