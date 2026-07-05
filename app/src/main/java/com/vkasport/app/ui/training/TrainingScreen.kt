@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -281,27 +282,79 @@ private fun InlineExerciseBlock(
                 Text("текущая", style = MaterialTheme.typography.labelSmall, color = DarkGray, modifier = Modifier.weight(1f))
             }
 
-            if (exercise.sets.isNotEmpty()) {
+            // Все подходы прошлой тренировки для этого упражнения —
+            // нужны чтобы показать "превью" ещё не введённых сегодня
+            // подходов (полупрозрачные строки-подсказки)
+            val previousSets = remember(exercise.name) {
+                val list = mutableListOf<com.vkasport.app.data.model.WorkoutSet>()
+                var i = 0
+                while (true) {
+                    val s = viewModel.getPreviousSet(exercise.name, i) ?: break
+                    list.add(s)
+                    i++
+                }
+                list
+            }
+
+            val totalRows = maxOf(exercise.sets.size, previousSets.size)
+
+            if (totalRows > 0) {
                 Spacer(Modifier.height(6.dp))
                 HorizontalDivider(color = SoftGray)
                 Spacer(Modifier.height(6.dp))
             }
 
-            exercise.sets.forEachIndexed { index, set ->
+            for (index in 0 until totalRows) {
+                val currentSet = exercise.sets.getOrNull(index)
+                val previousSet = previousSets.getOrNull(index)
+                // Следующий по счёту подход (ещё не введён сегодня, но это
+                // самый ближайший) остаётся ярким — это подсказка что делать
+                // дальше. Всё, что дальше него — полупрозрачное превью.
+                val isNextSlot = currentSet == null && index == exercise.sets.size
+                // Инлайн "+" рядом со строкой показываем ТОЛЬКО у самого
+                // ближайшего следующего подхода, и только если у него есть
+                // соответствующая строка прошлой тренировки (иначе — как
+                // раньше, только через нижнюю кнопку "+ подход")
+                val showInlinePlus = isNextSlot && previousSet != null
+                val rowAlpha = if (currentSet != null || isNextSlot) 1f else 0.4f
+
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .alpha(rowAlpha),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("${index + 1}", color = Black, fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
-                    Text(
-                        text = viewModel.getPreviousSet(exercise.name, index)?.let { "${formatW(it.weight)} × ${it.reps}" } ?: "—",
-                        color = DarkGray, fontSize = 14.sp, modifier = Modifier.weight(1f)
-                    )
+
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${formatW(set.weight)} × ${set.reps}", color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        if (viewModel.isExerciseRecord(exercise.name, set.weight, set.reps)) {
+                        Text(
+                            text = previousSet?.let { "${formatW(it.weight)} × ${it.reps}" } ?: "—",
+                            color = DarkGray, fontSize = 14.sp
+                        )
+                        if (previousSet != null && viewModel.isExerciseRecord(exercise.name, previousSet.weight, previousSet.reps)) {
                             Spacer(Modifier.width(4.dp))
                             Text("🏆", fontSize = 11.sp)
+                        }
+                    }
+
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        if (currentSet != null) {
+                            Text("${formatW(currentSet.weight)} × ${currentSet.reps}", color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            if (viewModel.isExerciseRecord(exercise.name, currentSet.weight, currentSet.reps)) {
+                                Spacer(Modifier.width(4.dp))
+                                Text("🏆", fontSize = 11.sp)
+                            }
+                        } else if (showInlinePlus) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .background(SoftGray, RoundedCornerShape(8.dp))
+                                    .clickable { addingSet = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", color = DarkGray, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            }
                         }
                     }
                 }
