@@ -1,9 +1,18 @@
 package com.vkasport.app.data.model
 
+import java.util.UUID
+
 data class WorkoutExercise(
     val name: String,
     // Группа мышц, к которой относится упражнение в текущей тренировке.
     // Null для старых записей архива, где это поле не хранилось.
     val muscleGroup: MuscleGroup? = null,
-    val sets: List<WorkoutSet> = emptyList()
+    val sets: List<WorkoutSet> = emptyList(),
+    // Уникальный id ЭКЗЕМПЛЯРА упражнения в рамках текущей тренировки.
+    // Нужен потому что одно и то же упражнение (по имени) теперь можно
+    // добавлять несколько раз за тренировку (например: жим лёжа → другое
+    // упражнение → снова жим лёжа) — каждое такое добавление создаёт
+    // отдельную карточку с собственными подходами, и им нужен разный
+    // стабильный ключ для Compose (иначе список крашится на дублях).
+    val id: String = UUID.randomUUID().toString()
 )

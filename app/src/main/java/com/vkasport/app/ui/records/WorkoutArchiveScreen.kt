@@ -177,7 +177,7 @@ fun WorkoutArchiveScreen(viewModel: TrainingSessionViewModel) {
         when (selectedTab) {
             0 -> ExerciseRecordsScreen(viewModel = viewModel, searchQuery = searchQuery)
             1 -> ArchiveGrid(
-                workouts        = workouts.reversed(),
+                workouts        = workouts,
                 exerciseHistory = exerciseHistory,
                 searchQuery     = searchQuery,
                 onCardClick     = { detailWorkout = it }
@@ -279,6 +279,11 @@ private fun ArchiveCard(
         best >= rec.maxWeight
     }
 
+    // workout.dateTime — момент ОКОНЧАНИЯ тренировки; время начала
+    // вычисляем вычитанием длительности
+    val startTime = workout.dateTime.minusMinutes(workout.durationMinutes)
+    val timeRange = "${startTime.format(timeFmt)} - ${workout.dateTime.format(timeFmt)}"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -295,7 +300,7 @@ private fun ArchiveCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 Text(workout.dateTime.format(dateFmt), color = White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(workout.dateTime.format(timeFmt), color = White.copy(alpha = 0.75f), fontSize = 13.sp)
+                Text(timeRange, color = White.copy(alpha = 0.75f), fontSize = 12.sp)
             }
         }
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
@@ -341,6 +346,8 @@ private fun WorkoutDetailSheet(
     val h = workout.durationMinutes / 60
     val m = workout.durationMinutes % 60
     val dur = when { h > 0 && m > 0 -> "$h ч $m мин"; h > 0 -> "$h ч"; else -> "$m мин" }
+    val detailStartTime = workout.dateTime.minusMinutes(workout.durationMinutes)
+    val detailTimeRange = "${detailStartTime.format(timeFmt)} - ${workout.dateTime.format(timeFmt)}"
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 32.dp)) {
 
@@ -348,7 +355,7 @@ private fun WorkoutDetailSheet(
             Column(Modifier.fillMaxWidth().background(DarkGray).padding(horizontal = 20.dp, vertical = 16.dp)) {
                 Text(workout.dateTime.format(dateFmt), color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(2.dp))
-                Text("${workout.dateTime.format(timeFmt)}  •  ${workout.muscleGroup}",
+                Text("$detailTimeRange  •  ${workout.muscleGroup}",
                     color = White.copy(alpha = 0.7f), fontSize = 13.sp)
             }
         }

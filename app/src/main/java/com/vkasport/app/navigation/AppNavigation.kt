@@ -1,13 +1,13 @@
 package com.vkasport.app.navigation
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import com.vkasport.app.data.local.database.AppDatabaseProvider
 import com.vkasport.app.ui.calendar.CalendarScreen
 import com.vkasport.app.ui.info.InfoScreen
@@ -16,10 +16,14 @@ import com.vkasport.app.ui.training.TrainingFlowScreen
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.viewmodel.WorkoutViewModel
 
+// ИЗМЕНЕНО: раньше здесь был NavHost с 4 отдельными route ("training",
+// "records", "calendar", "info") и переключение между ними происходило
+// только по тапу на нижнюю навигацию. Теперь это HorizontalPager — те же
+// 4 экрана, но между ними можно ещё и свайпать пальцем вбок, как просили.
 @Composable
 fun AppNavigation(
     viewModel: WorkoutViewModel,
-    navController: NavHostController,
+    pagerState: PagerState,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -31,35 +35,29 @@ fun AppNavigation(
         trainingViewModel.loadArchiveFromDatabase()
         trainingViewModel.loadRecordsFromDatabase()
         trainingViewModel.loadCustomExercises()
-        // Восстанавливаем незавершённую тренировку, если приложение было
-        // закрыто во время неё
         trainingViewModel.loadInProgressWorkout()
     }
 
-    NavHost(
-        navController  = navController,
-        startDestination = Screen.Training.route,
-        modifier       = modifier
-    ) {
+    HorizontalPager(
+        state = pagerState,
+        modifier = modifier.fillMaxSize()
+    ) { page ->
+        when (page) {
+            0 -> TrainingFlowScreen(viewModel = trainingViewModel)
 
-        composable(Screen.Training.route) {
-            TrainingFlowScreen(viewModel = trainingViewModel)
-        }
-
-        composable(Screen.Records.route) {
-            LaunchedEffect(Unit) {
-                trainingViewModel.loadArchiveFromDatabase()
-                trainingViewModel.loadRecordsFromDatabase()
+            1 -> {
+                // Обновляем архив/рекорды при каждом заходе на вкладку
+                // (например, после только что завершённой тренировки)
+                LaunchedEffect(Unit) {
+                    trainingViewModel.loadArchiveFromDatabase()
+                    trainingViewModel.loadRecordsFromDatabase()
+                }
+                WorkoutArchiveScreen(viewModel = trainingViewModel)
             }
-            WorkoutArchiveScreen(viewModel = trainingViewModel)
-        }
 
-        composable(Screen.Calendar.route) {
-            CalendarScreen(viewModel = trainingViewModel)
-        }
+            2 -> CalendarScreen(viewModel = trainingViewModel)
 
-        composable(Screen.Info.route) {
-            InfoScreen(viewModel = trainingViewModel)
+            3 -> InfoScreen(viewModel = trainingViewModel)
         }
     }
 }

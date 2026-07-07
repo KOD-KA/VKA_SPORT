@@ -22,7 +22,7 @@ fun StartWorkoutScreen(
     onStart: () -> Unit
 ) {
     val workouts by viewModel.completedWorkouts.collectAsState()
-    val lastWorkout = workouts.lastOrNull()
+    val lastWorkout = workouts.firstOrNull()
     val daysSince = viewModel.getDaysSinceLastWorkout()
 
     Column(

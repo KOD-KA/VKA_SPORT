@@ -165,7 +165,7 @@ private fun MonthTab(
                 Dot(Blue); Spacer(Modifier.width(5.dp)); Text("запланировано", color = White.copy(.7f), fontSize = 11.sp)
             }
             // Инфо выбранного дня
-            val selWorkout  = selectedDate?.let { workoutsByDate[it]?.lastOrNull() }
+            val selWorkout  = selectedDate?.let { workoutsByDate[it]?.firstOrNull() }
             val selPlanned  = selectedDate?.let { plannedByDate[it]?.firstOrNull() }
             if (selWorkout != null && selectedDate != null) {
                 HorizontalDivider(color = White.copy(.12f))

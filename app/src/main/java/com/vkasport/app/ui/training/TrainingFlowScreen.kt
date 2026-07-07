@@ -38,7 +38,7 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
     }
     SystemBarsAppearance(statusBarColor = barColor, darkIcons = darkIcons)
 
-    val lastWeight = completedWorkouts.lastOrNull()?.athleteWeight
+    val lastWeight = completedWorkouts.firstOrNull()?.athleteWeight
 
     when (currentScreen) {
 

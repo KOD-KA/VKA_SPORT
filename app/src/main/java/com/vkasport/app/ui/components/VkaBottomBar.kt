@@ -29,12 +29,17 @@ import com.vkasport.app.ui.theme.White
  * Нижняя навигация в едином стиле приложения: белый фон, тонкий разделитель
  * сверху, у выбранной вкладки — чёрный кружок под иконкой с плавной
  * анимацией и жирная подпись. У остальных — просто серая иконка и подпись.
+ *
+ * ИЗМЕНЕНО: раньше активная вкладка определялась по route строке из
+ * NavController. Теперь экраны переключаются через HorizontalPager (это
+ * даёт свайп между вкладками), поэтому активная вкладка определяется по
+ * текущей странице пейджера (selectedIndex).
  */
 @Composable
 fun VkaBottomBar(
     items: List<BottomNavItem>,
-    currentRoute: String?,
-    onItemClick: (BottomNavItem) -> Unit
+    selectedIndex: Int,
+    onItemClick: (Int) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(White)) {
 
@@ -47,12 +52,11 @@ fun VkaBottomBar(
                 .padding(top = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            items.forEach { item ->
-                val selected = currentRoute == item.route
+            items.forEachIndexed { index, item ->
                 BottomBarItem(
                     item = item,
-                    selected = selected,
-                    onClick = { onItemClick(item) }
+                    selected = index == selectedIndex,
+                    onClick = { onItemClick(index) }
                 )
             }
         }

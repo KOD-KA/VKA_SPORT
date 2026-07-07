@@ -219,7 +219,7 @@ private fun ExerciseListItem(
         modifier = Modifier
             .fillMaxWidth()
             .background(color = if (isAdded) SoftGray else White, shape = RoundedCornerShape(12.dp))
-            .clickable(enabled = !isAdded) { onClick() }
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

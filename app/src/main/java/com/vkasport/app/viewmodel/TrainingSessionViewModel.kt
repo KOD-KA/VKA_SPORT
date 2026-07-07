@@ -24,9 +24,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     private val _exerciseHistory  = MutableStateFlow<Map<String, ExerciseHistory>>(emptyMap())
     private val _plannedWorkouts  = MutableStateFlow<List<PlannedWorkout>>(emptyList())
     private val _customExercises  = MutableStateFlow<List<CustomExercise>>(emptyList())
-
-    // ID тренировки, только что сохранённой в БД (для добавления заметок
-    // на экране итогов после finishCurrentWorkout)
     private val _lastCompletedWorkoutId = MutableStateFlow<Long?>(null)
 
     val state: StateFlow<CurrentWorkoutState>     = _state
@@ -36,10 +33,16 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     val customExercises   = _customExercises.asStateFlow()
     val lastCompletedWorkoutId = _lastCompletedWorkoutId.asStateFlow()
 
+    // ВАЖНЫЙ ИНВАРИАНТ: _completedWorkouts ВСЕГДА отсортирован по dateTime
+    // по убыванию — [0] самая свежая тренировка, последняя — самая старая.
+    // Это гарантируется этой функцией — используйте её при любом изменении
+    // списка вместо прямого присваивания _completedWorkouts.value.
+    private fun setCompletedWorkouts(list: List<CompletedWorkout>) {
+        _completedWorkouts.value = list.sortedByDescending { it.dateTime }
+    }
+
     // ==================== ЦЕНТРАЛЬНОЕ ИЗМЕНЕНИЕ СОСТОЯНИЯ ====================
-    // Любое изменение _state теперь идёт через эту функцию — она же сразу
-    // сохраняет черновик тренировки в БД, чтобы прогресс не терялся при
-    // закрытии приложения.
+
     private fun setState(newState: CurrentWorkoutState) {
         _state.value = newState
         persistInProgressWorkout(newState)
@@ -48,7 +51,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     private fun persistInProgressWorkout(s: CurrentWorkoutState) {
         viewModelScope.launch {
             if (!s.trainingStarted || s.currentScreen == "start" || s.currentScreen == "summary") {
-                // Тренировка ещё не начата или уже завершена — черновик не нужен
                 database.inProgressWorkoutDao().clear()
                 return@launch
             }
@@ -64,7 +66,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         }
     }
 
-    // Восстанавливает черновик тренировки при запуске приложения, если он есть
     fun loadInProgressWorkout() {
         viewModelScope.launch {
             val saved = database.inProgressWorkoutDao().get() ?: return@launch
@@ -80,8 +81,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         }
     }
 
-    // ── Простая JSON-сериализация через org.json (входит в Android SDK,
-    //    доп. зависимостей не требует) ──────────────────────────────────
     private fun exercisesToJson(exercises: List<WorkoutExercise>): String {
         val arr = JSONArray()
         exercises.forEach { ex ->
@@ -117,6 +116,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                     val sObj = setsArr.getJSONObject(j)
                     sets.add(WorkoutSet(weight = sObj.getDouble("weight").toFloat(), reps = sObj.getInt("reps")))
                 }
+                // id НЕ сохраняем/восстанавливаем — при восстановлении
+                // каждый WorkoutExercise получает свежий UUID автоматически,
+                // это нормально: id важен только для UI-ключей в рамках
+                // текущей композиции, не для истории
                 list.add(WorkoutExercise(name = name, muscleGroup = group, sets = sets))
             }
             list
@@ -129,20 +132,21 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun selectMuscleGroup(group: MuscleGroup) { setState(_state.value.copy(selectedMuscleGroup = group)) }
 
+    // ИСПРАВЛЕНО: разрешено добавлять одно и то же упражнение (по имени)
+    // несколько раз за тренировку — например жим лёжа → другое упражнение →
+    // снова жим лёжа. Крашей не будет, т.к. у каждого экземпляра свой
+    // уникальный id (см. WorkoutExercise), используемый как ключ в списке.
     fun addExercise(name: String) {
         val group = _state.value.selectedMuscleGroup ?: return
-        // ИСПРАВЛЕНО: защита от дублей — раньше повторный тап по уже
-        // добавленному упражнению создавал вторую запись с тем же именем,
-        // и LazyColumn с key={"ex_${it.name}"} падал с крашем из-за
-        // одинаковых ключей.
-        if (_state.value.selectedExercises.any { it.name == name }) return
         val exercise = WorkoutExercise(name = name, muscleGroup = group)
         setState(_state.value.copy(selectedExercises = _state.value.selectedExercises + exercise))
     }
 
-    fun removeExercise(name: String) {
+    // Убрать КОНКРЕТНЫЙ экземпляр упражнения (по id, не по имени — иначе
+    // при дублях удалились бы сразу все одноимённые карточки)
+    fun removeExercise(exerciseId: String) {
         setState(_state.value.copy(
-            selectedExercises = _state.value.selectedExercises.filterNot { it.name == name }
+            selectedExercises = _state.value.selectedExercises.filterNot { it.id == exerciseId }
         ))
     }
 
@@ -156,18 +160,22 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     fun startTraining() { setState(_state.value.copy(trainingStarted = true, currentScreen = "weight")) }
     fun setCurrentScreen(s: String) { setState(_state.value.copy(currentScreen = s)) }
 
-    fun addSetToExercise(exerciseName: String, weight: Float, reps: Int) {
+    // Добавить подход КОНКРЕТНОМУ экземпляру упражнения (по id)
+    fun addSetToExercise(exerciseId: String, weight: Float, reps: Int) {
+        val target = _state.value.selectedExercises.find { it.id == exerciseId } ?: return
         val updated = _state.value.selectedExercises.map { ex ->
-            if (ex.name == exerciseName) ex.copy(sets = ex.sets + WorkoutSet(weight, reps)) else ex
+            if (ex.id == exerciseId) ex.copy(sets = ex.sets + WorkoutSet(weight, reps)) else ex
         }
         setState(_state.value.copy(selectedExercises = updated))
-        updateExerciseStats(exerciseName, weight, reps)
+        updateExerciseStats(target.name, weight, reps)
     }
 
-    // Редактирование уже введённого подхода (по индексу) во время тренировки
-    fun updateSet(exerciseName: String, index: Int, weight: Float, reps: Int) {
+    // Редактирование уже введённого подхода — тоже по id экземпляра,
+    // чтобы при дублях правился только тот конкретный подход в той
+    // конкретной карточке, по которой тапнули
+    fun updateSet(exerciseId: String, index: Int, weight: Float, reps: Int) {
         val updated = _state.value.selectedExercises.map { ex ->
-            if (ex.name == exerciseName && index in ex.sets.indices) {
+            if (ex.id == exerciseId && index in ex.sets.indices) {
                 val newSets = ex.sets.toMutableList()
                 newSets[index] = WorkoutSet(weight, reps)
                 ex.copy(sets = newSets)
@@ -184,16 +192,20 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     }
 
     // ==================== ПОВТОР ГРУППЫ ИЗ ПРОШЛОЙ ТРЕНИРОВКИ ====================
+    // _completedWorkouts гарантированно отсортирован от новых к старым,
+    // поэтому просто идём по списку СНАЧАЛА (без .asReversed() — раньше
+    // это было ошибкой и из-за неё показывались данные не из последней
+    // тренировки, а из более старой)
 
     fun getLastMuscleGroupExercises(group: MuscleGroup): List<String> {
-        val last = _completedWorkouts.value.asReversed()
+        val last = _completedWorkouts.value
             .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
             ?: return emptyList()
         return last.exercises.filter { it.muscleGroup == group }.map { it.name }
     }
 
     fun repeatLastMuscleGroup(group: MuscleGroup) {
-        val lastWithGroup = _completedWorkouts.value.asReversed()
+        val lastWithGroup = _completedWorkouts.value
             .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
             ?: return
 
@@ -210,6 +222,13 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun finishCurrentWorkout() {
         val s = _state.value
+        // ИСПРАВЛЕНО: фиксируем момент ЗАВЕРШЕНИЯ один раз и используем его
+        // и для БД, и для памяти — раньше в памяти использовалось время
+        // НАЧАЛА тренировки (s.workoutStartTime), а в БД — момент
+        // завершения, из-за чего сортировка и "последняя тренировка"
+        // работали по-разному до и после перезагрузки архива из БД.
+        val finishTime = LocalDateTime.now()
+        val durationMinutes = Duration.between(s.workoutStartTime, finishTime).toMinutes()
 
         val usedGroups = s.selectedExercises.mapNotNull { it.muscleGroup }.distinct()
         val muscleGroupSummary =
@@ -219,8 +238,8 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         viewModelScope.launch {
             val wid = database.workoutHistoryDao().insertWorkout(
                 CompletedWorkoutEntity(
-                    date = System.currentTimeMillis(),
-                    duration = Duration.between(s.workoutStartTime, LocalDateTime.now()).toMinutes(),
+                    date = finishTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                    duration = durationMinutes,
                     athleteWeight = s.athleteWeight,
                     muscleGroup = muscleGroupSummary
                 )
@@ -235,31 +254,29 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 )
                 ex.sets.forEach { set -> database.completedWorkoutSetDao().insert(CompletedWorkoutSetEntity(workoutId = wid, exerciseName = ex.name, weight = set.weight, reps = set.reps)) }
             }
-            // Тренировка сохранена в БД — черновик больше не нужен
             database.inProgressWorkoutDao().clear()
             _lastCompletedWorkoutId.value = wid
         }
-        _completedWorkouts.value = _completedWorkouts.value + CompletedWorkout(
-            dateTime = s.workoutStartTime, athleteWeight = s.athleteWeight,
+
+        setCompletedWorkouts(_completedWorkouts.value + CompletedWorkout(
+            dateTime = finishTime,
+            athleteWeight = s.athleteWeight,
             muscleGroup = muscleGroupSummary,
             exercises = s.selectedExercises,
-            durationMinutes = Duration.between(s.workoutStartTime, LocalDateTime.now()).toMinutes()
-        )
-        // currentScreen меняем напрямую (не через setState) — черновик всё
-        // равно чистится выше, лишний вызов persist не нужен
+            durationMinutes = durationMinutes
+        ))
         _state.value = _state.value.copy(currentScreen = "summary")
     }
 
-    // Сохранить заметки к только что завершённой тренировке (экран итогов)
     fun saveWorkoutNotes(notes: String) {
         val wid = _lastCompletedWorkoutId.value ?: return
         val trimmed = notes.trim().ifBlank { null }
         viewModelScope.launch {
             database.workoutHistoryDao().updateNotes(wid, trimmed)
         }
-        _completedWorkouts.value = _completedWorkouts.value.map {
+        setCompletedWorkouts(_completedWorkouts.value.map {
             if (it.id == wid) it.copy(notes = trimmed) else it
-        }
+        })
     }
 
     // ==================== УДАЛЕНИЕ ТРЕНИРОВКИ ИЗ АРХИВА ====================
@@ -270,7 +287,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
             database.completedWorkoutSetDao().deleteByWorkout(id)
             database.workoutHistoryDao().deleteById(id)
         }
-        _completedWorkouts.value = _completedWorkouts.value.filterNot { it.id == id }
+        setCompletedWorkouts(_completedWorkouts.value.filterNot { it.id == id })
     }
 
     // ==================== EXERCISE STATS ====================
@@ -308,7 +325,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun loadArchiveFromDatabase() {
         viewModelScope.launch {
-            _completedWorkouts.value = database.workoutHistoryDao().getAllWorkouts().map { e ->
+            val loaded = database.workoutHistoryDao().getAllWorkouts().map { e ->
                 val exEntities = database.completedWorkoutExerciseDao().getByWorkout(e.id)
                 val allSets    = database.completedWorkoutSetDao().getByWorkout(e.id).groupBy { it.exerciseName }
                 CompletedWorkout(
@@ -326,6 +343,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                     }
                 )
             }
+            setCompletedWorkouts(loaded)
         }
     }
 
@@ -401,24 +419,31 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     }
 
     // ==================== GETTERS ====================
+    // _completedWorkouts гарантированно DESC (новые первые) — см.
+    // setCompletedWorkouts(). Поэтому first() = самая свежая тренировка.
 
     fun getDaysSinceLastWorkout(): Long? {
         val w = _completedWorkouts.value; if (w.isEmpty()) return null
-        return Duration.between(w.last().dateTime, LocalDateTime.now()).toDays()
+        return Duration.between(w.first().dateTime, LocalDateTime.now()).toDays()
     }
     fun getWeightDifference(): Float? {
         val w = _completedWorkouts.value; if (w.size < 2) return null
-        return (w.last().athleteWeight ?: return null) - (w[w.size-2].athleteWeight ?: return null)
+        return (w[0].athleteWeight ?: return null) - (w[1].athleteWeight ?: return null)
     }
     fun isExerciseRecord(name: String, weight: Float, reps: Int): Boolean {
         val r = _exerciseHistory.value[name] ?: return false
         return weight >= r.maxWeight && reps >= r.maxWeightReps
     }
+    // ИСПРАВЛЕНО: раньше здесь был .asReversed(), что при DESC-порядке
+    // списка означало перебор от САМОЙ СТАРОЙ тренировки к новой — отсюда
+    // "прошлая тренировка" в карточке упражнения показывала не последние,
+    // а устаревшие данные. Теперь идём по списку как есть (новые первыми).
     fun getPreviousSet(name: String, index: Int): WorkoutSet? {
-        for (w in _completedWorkouts.value.asReversed()) {
+        for (w in _completedWorkouts.value) {
             val ex = w.exercises.find { it.name == name }
             if (ex != null && ex.sets.size > index) return ex.sets[index]
-        }; return null
+        }
+        return null
     }
     fun getCurrentExercisesCount() = _state.value.selectedExercises.size
     fun getCurrentSetsCount()      = _state.value.selectedExercises.sumOf { it.sets.size }
