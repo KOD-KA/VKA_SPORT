@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -115,6 +116,9 @@ fun InfoScreen(viewModel: TrainingSessionViewModel) {
     var planningDay by remember { mutableStateOf<ProgramDay?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // Экран всегда с белой шапкой — статус-бар с тёмными иконками
+    com.vkasport.app.ui.theme.SystemBarsAppearance(statusBarColor = White, darkIcons = true)
+
     Column(Modifier.fillMaxSize().background(White)) {
         Row(Modifier.fillMaxWidth().background(White).padding(horizontal = 20.dp)) {
             InfoTab("ТРЕНИРОВКИ И СОВЕТЫ", selectedTab == 0) { selectedTab = 0 }
@@ -197,6 +201,27 @@ private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
                 onToggle = { expandedProgram = if (expanded) null else index },
                 onPlanDay = onPlanDay
             )
+        }
+
+        // ── ВЕРСИЯ ПРИЛОЖЕНИЯ ────────────────────────────────────────
+        item {
+            val context = LocalContext.current
+            val versionName = remember {
+                try {
+                    context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "VKA SPORT" + (versionName?.let { " · v$it" } ?: ""),
+                fontSize = 11.sp,
+                color = DarkGray,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -361,15 +386,20 @@ private fun QuickPlanSheet(
         Spacer(Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val minuteFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+            val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
             OutlinedTextField(hourStr, { hourStr = it.filter(Char::isDigit).take(2) },
                 label = { Text("Час", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = androidx.compose.ui.text.input.ImeAction.Next),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onNext = { minuteFocusRequester.requestFocus() }),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                     focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
             Text(":", color = Black, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             OutlinedTextField(minStr, { minStr = it.filter(Char::isDigit).take(2) },
-                label = { Text("Мин", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                label = { Text("Мин", color = DarkGray) },
+                modifier = Modifier.width(90.dp).focusRequester(minuteFocusRequester), singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { focusManager.clearFocus() }),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                     focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
         }

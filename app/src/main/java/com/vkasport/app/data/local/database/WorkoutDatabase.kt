@@ -16,9 +16,10 @@ import com.vkasport.app.data.local.entity.*
         ExerciseHistoryEntity::class,
         PlannedWorkoutEntity::class,
         PlannedExerciseEntity::class,
-        CustomExerciseEntity::class
+        CustomExerciseEntity::class,
+        InProgressWorkoutEntity::class
     ],
-    version = 13,          // 12 -> 13: добавлена колонка muscleGroup в completed_workout_exercises
+    version = 14,          // 13 -> 14: notes в completed_workouts + таблица in_progress_workout
     exportSchema = false
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -31,4 +32,5 @@ abstract class WorkoutDatabase : RoomDatabase() {
     abstract fun completedWorkoutSetDao(): CompletedWorkoutSetDao
     abstract fun plannedWorkoutDao(): PlannedWorkoutDao
     abstract fun customExerciseDao(): CustomExerciseDao
+    abstract fun inProgressWorkoutDao(): InProgressWorkoutDao
 }

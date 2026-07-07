@@ -159,7 +159,7 @@ private fun RecordCard(record: ExerciseHistory, isPrimary: Boolean) {
             else "кг"
 
             MetricRow(
-                icon        = "📦",
+                icon        = "📊",
                 label       = "макс. объём",
                 bigValue    = "${record.bestVolume.toInt()}",
                 subValue    = volSubValue,

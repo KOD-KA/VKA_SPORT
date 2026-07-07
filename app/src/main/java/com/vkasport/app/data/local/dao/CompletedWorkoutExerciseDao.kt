@@ -19,4 +19,7 @@ interface CompletedWorkoutExerciseDao {
     suspend fun getByWorkout(
         workoutId: Long
     ): List<CompletedWorkoutExerciseEntity>
+
+    @Query("DELETE FROM completed_workout_exercises WHERE workoutId = :workoutId")
+    suspend fun deleteByWorkout(workoutId: Long)
 }

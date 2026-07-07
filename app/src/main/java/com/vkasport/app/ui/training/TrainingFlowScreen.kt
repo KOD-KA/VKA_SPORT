@@ -5,8 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,12 +75,21 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
 
                 Spacer(Modifier.height(28.dp))
 
+                val focusManager = LocalFocusManager.current
+                fun confirmWeight() {
+                    liveWeight?.let { w -> viewModel.updateAthleteWeight(w) }
+                    focusManager.clearFocus()
+                    viewModel.setCurrentScreen("muscles")
+                }
+
                 OutlinedTextField(
                     value = weightText,
                     onValueChange = { weightText = it },
                     label = { Text("кг", color = White.copy(alpha = 0.6f)) },
                     textStyle = MaterialTheme.typography.headlineMedium.copy(color = White),
                     modifier = Modifier.width(180.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { confirmWeight() }),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = White, unfocusedBorderColor = White.copy(alpha = 0.4f),
                         cursorColor = White, focusedTextColor = White, unfocusedTextColor = White
@@ -102,10 +115,7 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                         .height(50.dp)
                         .widthIn(min = 180.dp, max = 260.dp)
                         .background(White, RoundedCornerShape(12.dp))
-                        .clickable {
-                            liveWeight?.let { w -> viewModel.updateAthleteWeight(w) }
-                            viewModel.setCurrentScreen("muscles")
-                        }
+                        .clickable { confirmWeight() }
                         .padding(horizontal = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {

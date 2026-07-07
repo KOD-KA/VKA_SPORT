@@ -6,7 +6,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -241,9 +246,45 @@ private fun InlineExerciseBlock(
     viewModel: TrainingSessionViewModel,
     onRemove: () -> Unit
 ) {
+    // addingSet=true — форма добавления НОВОГО подхода в конец
+    // editingIndex!=null — форма редактирования УЖЕ введённого подхода
+    // (визуально никак не помечено кликабельным — по замыслу пользователь
+    // должен сам заметить, что по строке можно тапнуть)
     var addingSet by remember(exercise.name) { mutableStateOf(false) }
+    var editingIndex by remember(exercise.name) { mutableStateOf<Int?>(null) }
     var weightInput by remember(exercise.name) { mutableStateOf("") }
     var repsInput by remember(exercise.name) { mutableStateOf("") }
+
+    val focusManager = LocalFocusManager.current
+    val repsFocusRequester = remember(exercise.name) { FocusRequester() }
+
+    fun openAddForm() {
+        editingIndex = null
+        weightInput = ""
+        repsInput = ""
+        addingSet = true
+    }
+
+    fun openEditForm(index: Int, set: com.vkasport.app.data.model.WorkoutSet) {
+        addingSet = false
+        editingIndex = index
+        weightInput = formatW(set.weight)
+        repsInput = set.reps.toString()
+    }
+
+    fun confirmForm() {
+        val w = weightInput.replace(",", ".").toFloatOrNull() ?: return
+        val r = repsInput.toIntOrNull() ?: return
+        val idx = editingIndex
+        if (idx != null) {
+            viewModel.updateSet(exercise.name, idx, w, r)
+        } else {
+            viewModel.addSetToExercise(exercise.name, w, r)
+        }
+        weightInput = ""; repsInput = ""
+        addingSet = false; editingIndex = null
+        focusManager.clearFocus()
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp)
@@ -307,14 +348,7 @@ private fun InlineExerciseBlock(
             for (index in 0 until totalRows) {
                 val currentSet = exercise.sets.getOrNull(index)
                 val previousSet = previousSets.getOrNull(index)
-                // Следующий по счёту подход (ещё не введён сегодня, но это
-                // самый ближайший) остаётся ярким — это подсказка что делать
-                // дальше. Всё, что дальше него — полупрозрачное превью.
                 val isNextSlot = currentSet == null && index == exercise.sets.size
-                // Инлайн "+" рядом со строкой показываем ТОЛЬКО у самого
-                // ближайшего следующего подхода, и только если у него есть
-                // соответствующая строка прошлой тренировки (иначе — как
-                // раньше, только через нижнюю кнопку "+ подход")
                 val showInlinePlus = isNextSlot && previousSet != null
                 val rowAlpha = if (currentSet != null || isNextSlot) 1f else 0.4f
 
@@ -340,17 +374,25 @@ private fun InlineExerciseBlock(
 
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         if (currentSet != null) {
-                            Text("${formatW(currentSet.weight)} × ${currentSet.reps}", color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            if (viewModel.isExerciseRecord(exercise.name, currentSet.weight, currentSet.reps)) {
-                                Spacer(Modifier.width(4.dp))
-                                Text("🏆", fontSize = 11.sp)
+                            // Строка кликабельна — можно отредактировать уже
+                            // введённый подход. Специально без визуальных
+                            // подсказок (карандаша и т.п.) — так попросили.
+                            Row(
+                                modifier = Modifier.clickable { openEditForm(index, currentSet) },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("${formatW(currentSet.weight)} × ${currentSet.reps}", color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                if (viewModel.isExerciseRecord(exercise.name, currentSet.weight, currentSet.reps)) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("🏆", fontSize = 11.sp)
+                                }
                             }
                         } else if (showInlinePlus) {
                             Box(
                                 modifier = Modifier
                                     .size(26.dp)
                                     .background(SoftGray, RoundedCornerShape(8.dp))
-                                    .clickable { addingSet = true },
+                                    .clickable { openAddForm() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("+", color = DarkGray, fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -362,14 +404,18 @@ private fun InlineExerciseBlock(
 
             Spacer(Modifier.height(8.dp))
 
-            if (!addingSet) {
+            if (!addingSet && editingIndex == null) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(44.dp).background(SoftGray, RoundedCornerShape(10.dp)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .background(SoftGray, RoundedCornerShape(10.dp))
+                        // ИСПРАВЛЕНО: раньше кликабельной была только область
+                        // TextButton вокруг текста, а не вся кнопка целиком
+                        .clickable { openAddForm() },
                     contentAlignment = Alignment.Center
                 ) {
-                    TextButton(onClick = { addingSet = true }) {
-                        Text("+ подход", color = Black, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                    }
+                    Text("+ подход", color = Black, fontWeight = FontWeight.Medium, fontSize = 14.sp)
                 }
             } else {
                 Row(
@@ -380,7 +426,9 @@ private fun InlineExerciseBlock(
                     OutlinedTextField(
                         value = weightInput, onValueChange = { weightInput = it },
                         label = { Text("кг", color = DarkGray) }, modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { repsFocusRequester.requestFocus() }),
+                        singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,
                             focusedTextColor = Black, unfocusedTextColor = Black, focusedLabelColor = Black
@@ -388,28 +436,24 @@ private fun InlineExerciseBlock(
                     )
                     OutlinedTextField(
                         value = repsInput, onValueChange = { repsInput = it },
-                        label = { Text("повт.", color = DarkGray) }, modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true,
+                        label = { Text("повт.", color = DarkGray) },
+                        modifier = Modifier.weight(1f).focusRequester(repsFocusRequester),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { confirmForm() }),
+                        singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,
                             focusedTextColor = Black, unfocusedTextColor = Black, focusedLabelColor = Black
                         )
                     )
                     Box(
-                        modifier = Modifier.size(56.dp).background(Black, RoundedCornerShape(12.dp)),
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(Black, RoundedCornerShape(12.dp))
+                            .clickable { confirmForm() },
                         contentAlignment = Alignment.Center
                     ) {
-                        TextButton(
-                            onClick = {
-                                val w = weightInput.replace(",", ".").toFloatOrNull() ?: return@TextButton
-                                val r = repsInput.toIntOrNull() ?: return@TextButton
-                                viewModel.addSetToExercise(exercise.name, w, r)
-                                weightInput = ""; repsInput = ""; addingSet = false
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Text("✓", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
+                        Text("✓", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

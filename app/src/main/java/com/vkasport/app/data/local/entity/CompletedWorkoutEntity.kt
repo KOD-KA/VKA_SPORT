@@ -16,6 +16,10 @@ data class CompletedWorkoutEntity(
 
     val athleteWeight: Float? = null,
 
-    val muscleGroup: String
+    val muscleGroup: String,
+
+    // Заметки о тренировке (самочувствие и т.п.), добавляются на экране
+    // итогов после завершения
+    val notes: String? = null
 
 )

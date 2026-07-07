@@ -165,6 +165,15 @@ fun ExerciseSelectionScreen(
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                                    onDone = {
+                                        if (customText.isNotBlank()) {
+                                            onAddCustomExercise(customText.trim())
+                                            customText = ""
+                                            addingCustom = false
+                                        }
+                                    }
+                                ),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Black, unfocusedBorderColor = DarkGray.copy(alpha = 0.3f),
                                     cursorColor = Black, focusedTextColor = Black, unfocusedTextColor = Black
@@ -210,7 +219,7 @@ private fun ExerciseListItem(
         modifier = Modifier
             .fillMaxWidth()
             .background(color = if (isAdded) SoftGray else White, shape = RoundedCornerShape(12.dp))
-            .clickable { onClick() }
+            .clickable(enabled = !isAdded) { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

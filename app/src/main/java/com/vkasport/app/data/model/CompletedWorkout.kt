@@ -14,5 +14,7 @@ data class CompletedWorkout(
 
     val exercises: List<WorkoutExercise>,
 
-    val durationMinutes: Long = 0
+    val durationMinutes: Long = 0,
+
+    val notes: String? = null
 )

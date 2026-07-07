@@ -19,6 +19,12 @@ interface WorkoutHistoryDao {
     suspend fun getAllWorkouts():
             List<CompletedWorkoutEntity>
 
+    @Query("UPDATE completed_workouts SET notes = :notes WHERE id = :id")
+    suspend fun updateNotes(id: Long, notes: String?)
+
+    @Query("DELETE FROM completed_workouts WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query(
         "DELETE FROM completed_workouts"
     )

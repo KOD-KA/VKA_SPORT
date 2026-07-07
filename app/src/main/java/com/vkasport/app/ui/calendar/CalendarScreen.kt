@@ -7,7 +7,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +52,9 @@ fun CalendarScreen(viewModel: TrainingSessionViewModel) {
     var detailWorkout by remember { mutableStateOf<CompletedWorkout?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // Экран всегда с белой шапкой — статус-бар с тёмными иконками
+    com.vkasport.app.ui.theme.SystemBarsAppearance(statusBarColor = White, darkIcons = true)
+
     LaunchedEffect(Unit) { viewModel.loadPlannedWorkouts() }
 
     val workoutsByDate = remember(workouts) { workouts.groupBy { it.dateTime.toLocalDate() } }
@@ -77,7 +85,7 @@ fun CalendarScreen(viewModel: TrainingSessionViewModel) {
     detailWorkout?.let { w ->
         ModalBottomSheet(onDismissRequest = { detailWorkout = null }, sheetState = sheetState,
             containerColor = White, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)) {
-            WorkoutDetailSheet(w)
+            WorkoutDetailSheet(w, viewModel = viewModel, onDeleted = { detailWorkout = null })
         }
     }
 }
@@ -466,15 +474,20 @@ private fun AddPlannedWorkoutSheet(
                 Text("Время", fontSize = 12.sp, color = DarkGray, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val minuteFocusRequester = remember { FocusRequester() }
+                    val focusManager = LocalFocusManager.current
                     OutlinedTextField(hourStr, { hourStr = it.filter(Char::isDigit).take(2) },
                         label = { Text("Час", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { minuteFocusRequester.requestFocus() }),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                             focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
                     Text(":", color = Black, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     OutlinedTextField(minStr, { minStr = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Мин", color = DarkGray) }, modifier = Modifier.width(90.dp), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text("Мин", color = DarkGray) },
+                        modifier = Modifier.width(90.dp).focusRequester(minuteFocusRequester), singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Black, unfocusedBorderColor = LightGray,
                             focusedTextColor = Black, unfocusedTextColor = Black, cursorColor = Black))
                 }
@@ -548,7 +561,12 @@ private fun AddPlannedWorkoutSheet(
 // ═══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun WorkoutDetailSheet(workout: CompletedWorkout) {
+private fun WorkoutDetailSheet(
+    workout: CompletedWorkout,
+    viewModel: TrainingSessionViewModel,
+    onDeleted: () -> Unit
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val dateFmt = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("ru"))
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
     val totalSets   = workout.exercises.sumOf { it.sets.size }
@@ -607,6 +625,57 @@ private fun WorkoutDetailSheet(workout: CompletedWorkout) {
                 }
             }
         }
+
+        // ── ЗАМЕТКИ (если есть) ─────────────────────────────────────
+        workout.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
+                        .background(SoftGray, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Text("ЗАМЕТКИ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = DarkGray)
+                    Spacer(Modifier.height(6.dp))
+                    Text(notes, fontSize = 14.sp, color = Black, lineHeight = 19.sp)
+                }
+            }
+        }
+
+        // ── УДАЛИТЬ ТРЕНИРОВКУ ──────────────────────────────────────
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .background(SoftGray, RoundedCornerShape(12.dp))
+                    .clickable { showDeleteConfirm = true }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Удалить тренировку", color = Color(0xFFE53935), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            title = { Text("Удалить тренировку?", fontWeight = FontWeight.Bold) },
+            text = { Text("Тренировка и все данные о ней (упражнения, подходы) будут удалены без возможности восстановления.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteWorkout(workout.id)
+                    showDeleteConfirm = false
+                    onDeleted()
+                }) { Text("Удалить", color = Color(0xFFE53935), fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Отмена", color = DarkGray) }
+            }
+        )
     }
 }
 

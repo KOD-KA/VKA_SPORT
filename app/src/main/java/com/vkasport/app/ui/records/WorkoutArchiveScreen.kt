@@ -68,6 +68,9 @@ fun WorkoutArchiveScreen(viewModel: TrainingSessionViewModel) {
     val focusRequester = remember { FocusRequester() }
     val focusManager   = LocalFocusManager.current
 
+    // Экран всегда с белой шапкой сверху — статус-бар с тёмными иконками
+    com.vkasport.app.ui.theme.SystemBarsAppearance(statusBarColor = White, darkIcons = true)
+
     // Сбрасываем поиск при смене таба
     LaunchedEffect(selectedTab) {
         searchQuery = ""
@@ -190,7 +193,11 @@ fun WorkoutArchiveScreen(viewModel: TrainingSessionViewModel) {
             containerColor   = White,
             shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         ) {
-            WorkoutDetailSheet(workout = workout)
+            WorkoutDetailSheet(
+                workout = workout,
+                viewModel = viewModel,
+                onDeleted = { detailWorkout = null }
+            )
         }
     }
 }
@@ -321,7 +328,12 @@ private fun ArchiveCard(
 // ═══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun WorkoutDetailSheet(workout: CompletedWorkout) {
+private fun WorkoutDetailSheet(
+    workout: CompletedWorkout,
+    viewModel: TrainingSessionViewModel,
+    onDeleted: () -> Unit
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val dateFmt = DateTimeFormatter.ofPattern("dd MMMM yyyy", java.util.Locale("ru"))
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
     val totalSets   = workout.exercises.sumOf { it.sets.size }
@@ -403,6 +415,57 @@ private fun WorkoutDetailSheet(workout: CompletedWorkout) {
                 }
             }
         }
+
+        // ── ЗАМЕТКИ (если есть) ─────────────────────────────────────
+        workout.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
+                        .background(SoftGray, RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Text("ЗАМЕТКИ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = DarkGray)
+                    Spacer(Modifier.height(6.dp))
+                    Text(notes, fontSize = 14.sp, color = Black, lineHeight = 19.sp)
+                }
+            }
+        }
+
+        // ── УДАЛИТЬ ТРЕНИРОВКУ ──────────────────────────────────────
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .background(SoftGray, RoundedCornerShape(12.dp))
+                    .clickable { showDeleteConfirm = true }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Удалить тренировку", color = Color(0xFFE53935), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            title = { Text("Удалить тренировку?", fontWeight = FontWeight.Bold) },
+            text = { Text("Тренировка и все данные о ней (упражнения, подходы) будут удалены без возможности восстановления.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteWorkout(workout.id)
+                    showDeleteConfirm = false
+                    onDeleted()
+                }) { Text("Удалить", color = Color(0xFFE53935), fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Отмена", color = DarkGray) }
+            }
+        )
     }
 }
 
