@@ -26,12 +26,19 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     private val _customExercises  = MutableStateFlow<List<CustomExercise>>(emptyList())
     private val _lastCompletedWorkoutId = MutableStateFlow<Long?>(null)
 
+    // ТАЙМЕР ОТДЫХА: момент последней записи подхода (epoch millis),
+    // null = таймер не идёт. Хранится ТОЛЬКО в памяти (не в БД, схему
+    // не трогаем) — после перезапуска приложения таймер запустится
+    // заново при следующем подходе, это осознанный компромисс.
+    private val _restTimerStart = MutableStateFlow<Long?>(null)
+
     val state: StateFlow<CurrentWorkoutState>     = _state
     val completedWorkouts = _completedWorkouts.asStateFlow()
     val exerciseHistory   = _exerciseHistory.asStateFlow()
     val plannedWorkouts   = _plannedWorkouts.asStateFlow()
     val customExercises   = _customExercises.asStateFlow()
     val lastCompletedWorkoutId = _lastCompletedWorkoutId.asStateFlow()
+    val restTimerStart = _restTimerStart.asStateFlow()
 
     // ВАЖНЫЙ ИНВАРИАНТ: _completedWorkouts ВСЕГДА отсортирован по dateTime
     // по убыванию — [0] самая свежая тренировка, последняя — самая старая.
@@ -158,7 +165,14 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun updateAthleteWeight(w: Float) { setState(_state.value.copy(athleteWeight = w)) }
     fun startTraining() { setState(_state.value.copy(trainingStarted = true, currentScreen = "weight")) }
-    fun setCurrentScreen(s: String) { setState(_state.value.copy(currentScreen = s)) }
+    fun setCurrentScreen(s: String) {
+        // Запускаем таймер отдыха при первом входе на экран тренировки,
+        // чтобы он показывал время ещё до первого записанного подхода
+        if (s == "training" && _restTimerStart.value == null) {
+            _restTimerStart.value = System.currentTimeMillis()
+        }
+        setState(_state.value.copy(currentScreen = s))
+    }
 
     // Добавить подход КОНКРЕТНОМУ экземпляру упражнения (по id)
     fun addSetToExercise(exerciseId: String, weight: Float, reps: Int) {
@@ -168,6 +182,8 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         }
         setState(_state.value.copy(selectedExercises = updated))
         updateExerciseStats(target.name, weight, reps)
+        // Записан новый подход — таймер отдыха начинает отсчёт заново
+        _restTimerStart.value = System.currentTimeMillis()
     }
 
     // Редактирование уже введённого подхода — тоже по id экземпляра,
@@ -185,6 +201,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     }
 
     fun resetWorkout() {
+        _restTimerStart.value = null
         setState(CurrentWorkoutState())
         _lastCompletedWorkoutId.value = null
         loadArchiveFromDatabase()
@@ -265,6 +282,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
             exercises = s.selectedExercises,
             durationMinutes = durationMinutes
         ))
+        _restTimerStart.value = null
         _state.value = _state.value.copy(currentScreen = "summary")
     }
 

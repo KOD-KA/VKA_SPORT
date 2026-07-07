@@ -68,8 +68,6 @@ fun WorkoutArchiveScreen(viewModel: TrainingSessionViewModel) {
     val focusRequester = remember { FocusRequester() }
     val focusManager   = LocalFocusManager.current
 
-    // Экран всегда с белой шапкой сверху — статус-бар с тёмными иконками
-    com.vkasport.app.ui.theme.SystemBarsAppearance(statusBarColor = White, darkIcons = true)
 
     // Сбрасываем поиск при смене таба
     LaunchedEffect(selectedTab) {

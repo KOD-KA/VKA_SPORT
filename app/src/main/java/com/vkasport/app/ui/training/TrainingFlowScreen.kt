@@ -19,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.ui.theme.Black
-import com.vkasport.app.ui.theme.SystemBarsAppearance
 import com.vkasport.app.ui.theme.White
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 
@@ -31,12 +30,22 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
     val customExercises by viewModel.customExercises.collectAsState()
     val currentScreen = state.currentScreen
 
-    val (barColor, darkIcons) = when (currentScreen) {
-        "start", "weight", "summary" -> Black to false
-        "muscles"                    -> White to true
-        else                         -> Black to false
+    // ИЗМЕНЕНО: статус-баром теперь управляет ТОЛЬКО MainScreen.kt
+    // (единая точка, без гонок между страницами Pager).
+
+    // Уведомление-таймер в шторке: показывается пока идёт экран тренировки,
+    // убирается при выходе на итоги/старт. Системный chronometer в
+    // уведомлении тикает сам — обновлять уведомление каждую секунду не нужно.
+    val restTimerStart by viewModel.restTimerStart.collectAsState()
+    val notifContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(currentScreen, restTimerStart) {
+        val start = restTimerStart
+        if (currentScreen == "training" && start != null) {
+            com.vkasport.app.notifications.RestTimerNotification.show(notifContext, start)
+        } else {
+            com.vkasport.app.notifications.RestTimerNotification.cancel(notifContext)
+        }
     }
-    SystemBarsAppearance(statusBarColor = barColor, darkIcons = darkIcons)
 
     val lastWeight = completedWorkouts.firstOrNull()?.athleteWeight
 

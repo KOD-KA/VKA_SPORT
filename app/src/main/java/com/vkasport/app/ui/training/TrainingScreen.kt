@@ -46,19 +46,30 @@ fun TrainingScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val completedWorkouts by viewModel.completedWorkouts.collectAsState()
+    val restTimerStart by viewModel.restTimerStart.collectAsState()
     val fmt = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
 
-    // ИСПРАВЛЕНО: сравниваем ВВЕДЁННЫЙ СЕГОДНЯ вес (state.athleteWeight)
-    // с весом из ПОСЛЕДНЕЙ завершённой тренировки — а не два прошлых
-    // значения между собой (как было раньше через getWeightDifference()).
-    val lastWeight = completedWorkouts.lastOrNull()?.athleteWeight
+    // Тик раз в секунду для таймера отдыха (только пока этот экран открыт)
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(restTimerStart) {
+        while (true) {
+            nowMs = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    // completedWorkouts гарантированно отсортирован от новых к старым —
+    // firstOrNull() это последняя завершённая тренировка
+    val lastWeight = completedWorkouts.firstOrNull()?.athleteWeight
     val weightDiff = if (lastWeight != null && state.athleteWeight != null)
         state.athleteWeight!! - lastWeight
     else null
 
     // Диалоги подтверждения удаления
     var confirmRemoveGroup by remember { mutableStateOf<MuscleGroup?>(null) }
-    var confirmRemoveExercise by remember { mutableStateOf<String?>(null) }
+    // ИСПРАВЛЕНО: храним весь WorkoutExercise (нужен и id для удаления,
+    // и name для текста диалога), а не только имя
+    var confirmRemoveExercise by remember { mutableStateOf<WorkoutExercise?>(null) }
 
     val groupedExercises: Map<MuscleGroup, List<WorkoutExercise>> = remember(state.selectedExercises) {
         state.selectedExercises
@@ -81,18 +92,29 @@ fun TrainingScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("начало: ${state.workoutStartTime.format(fmt)}", color = White.copy(alpha = 0.65f), fontSize = 12.sp)
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(state.athleteWeight?.let { "%.1f".format(it) } ?: "—", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Text(" кг", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    if (weightDiff != null) {
-                        Spacer(Modifier.width(4.dp))
-                        val diffColor = when {
-                            weightDiff > 0f -> GreenColor
-                            weightDiff < 0f -> RedColor
-                            else -> White
+                // Таймер отдыха НАД весом: сбрасывается после каждой записи подхода
+                Column(horizontalAlignment = Alignment.End) {
+                    restTimerStart?.let { start ->
+                        val restSec = ((nowMs - start) / 1000).coerceAtLeast(0)
+                        Text(
+                            "⏱ %d:%02d".format(restSec / 60, restSec % 60),
+                            color = White, fontSize = 16.sp, fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(state.athleteWeight?.let { "%.1f".format(it) } ?: "—", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(" кг", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        if (weightDiff != null) {
+                            Spacer(Modifier.width(4.dp))
+                            val diffColor = when {
+                                weightDiff > 0f -> GreenColor
+                                weightDiff < 0f -> RedColor
+                                else -> White
+                            }
+                            val sign = if (weightDiff > 0f) "+" else ""
+                            Text("($sign%.1f)".format(weightDiff), color = diffColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
-                        val sign = if (weightDiff > 0f) "+" else ""
-                        Text("($sign%.1f)".format(weightDiff), color = diffColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -133,12 +155,14 @@ fun TrainingScreen(
                     }
                 }
 
-                // Упражнения этой группы
-                items(exercises, key = { "ex_${it.name}" }) { exercise ->
+                // Упражнения этой группы — ключ по УНИКАЛЬНОМУ id экземпляра
+                // (не по имени!), иначе повторное добавление одноимённого
+                // упражнения крашит LazyColumn на дублирующихся ключах
+                items(exercises, key = { it.id }) { exercise ->
                     InlineExerciseBlock(
                         exercise = exercise,
                         viewModel = viewModel,
-                        onRemove = { confirmRemoveExercise = exercise.name }
+                        onRemove = { confirmRemoveExercise = exercise }
                     )
                 }
 
@@ -219,17 +243,17 @@ fun TrainingScreen(
     }
 
     // ===== ДИАЛОГ: УДАЛИТЬ УПРАЖНЕНИЕ =====
-    confirmRemoveExercise?.let { name ->
+    confirmRemoveExercise?.let { ex ->
         AlertDialog(
             onDismissRequest = { confirmRemoveExercise = null },
             containerColor = White,
             titleContentColor = Black,
             textContentColor = DarkGray,
             title = { Text("Убрать упражнение?", fontWeight = FontWeight.Bold) },
-            text = { Text("«$name» и все его подходы будут удалены из текущей тренировки.") },
+            text = { Text("«${ex.name}» и все его подходы будут удалены из текущей тренировки.") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.removeExercise(name)
+                    viewModel.removeExercise(ex.id)
                     confirmRemoveExercise = null
                 }) { Text("Убрать", color = RedColor, fontWeight = FontWeight.Bold) }
             },
@@ -248,15 +272,13 @@ private fun InlineExerciseBlock(
 ) {
     // addingSet=true — форма добавления НОВОГО подхода в конец
     // editingIndex!=null — форма редактирования УЖЕ введённого подхода
-    // (визуально никак не помечено кликабельным — по замыслу пользователь
-    // должен сам заметить, что по строке можно тапнуть)
-    var addingSet by remember(exercise.name) { mutableStateOf(false) }
-    var editingIndex by remember(exercise.name) { mutableStateOf<Int?>(null) }
-    var weightInput by remember(exercise.name) { mutableStateOf("") }
-    var repsInput by remember(exercise.name) { mutableStateOf("") }
+    var addingSet by remember(exercise.id) { mutableStateOf(false) }
+    var editingIndex by remember(exercise.id) { mutableStateOf<Int?>(null) }
+    var weightInput by remember(exercise.id) { mutableStateOf("") }
+    var repsInput by remember(exercise.id) { mutableStateOf("") }
 
     val focusManager = LocalFocusManager.current
-    val repsFocusRequester = remember(exercise.name) { FocusRequester() }
+    val repsFocusRequester = remember(exercise.id) { FocusRequester() }
 
     fun openAddForm() {
         editingIndex = null
@@ -272,14 +294,17 @@ private fun InlineExerciseBlock(
         repsInput = set.reps.toString()
     }
 
+    // ИСПРАВЛЕНО: передаём exercise.id (уникальный id экземпляра), а не
+    // exercise.name — ViewModel ищет упражнение по id, поиск по имени
+    // никогда не находил совпадения и подход просто не сохранялся
     fun confirmForm() {
         val w = weightInput.replace(",", ".").toFloatOrNull() ?: return
         val r = repsInput.toIntOrNull() ?: return
         val idx = editingIndex
         if (idx != null) {
-            viewModel.updateSet(exercise.name, idx, w, r)
+            viewModel.updateSet(exercise.id, idx, w, r)
         } else {
-            viewModel.addSetToExercise(exercise.name, w, r)
+            viewModel.addSetToExercise(exercise.id, w, r)
         }
         weightInput = ""; repsInput = ""
         addingSet = false; editingIndex = null
@@ -323,9 +348,10 @@ private fun InlineExerciseBlock(
                 Text("текущая", style = MaterialTheme.typography.labelSmall, color = DarkGray, modifier = Modifier.weight(1f))
             }
 
-            // Все подходы прошлой тренировки для этого упражнения —
-            // нужны чтобы показать "превью" ещё не введённых сегодня
-            // подходов (полупрозрачные строки-подсказки)
+            // Все подходы прошлой тренировки для этого упражнения (по
+            // ИМЕНИ — это общая история упражнения, а не конкретной
+            // карточки) — нужны для "превью" ещё не введённых сегодня
+            // подходов
             val previousSets = remember(exercise.name) {
                 val list = mutableListOf<com.vkasport.app.data.model.WorkoutSet>()
                 var i = 0
@@ -410,8 +436,6 @@ private fun InlineExerciseBlock(
                         .fillMaxWidth()
                         .height(44.dp)
                         .background(SoftGray, RoundedCornerShape(10.dp))
-                        // ИСПРАВЛЕНО: раньше кликабельной была только область
-                        // TextButton вокруг текста, а не вся кнопка целиком
                         .clickable { openAddForm() },
                     contentAlignment = Alignment.Center
                 ) {

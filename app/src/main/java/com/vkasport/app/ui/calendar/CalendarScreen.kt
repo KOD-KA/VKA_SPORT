@@ -52,8 +52,6 @@ fun CalendarScreen(viewModel: TrainingSessionViewModel) {
     var detailWorkout by remember { mutableStateOf<CompletedWorkout?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Экран всегда с белой шапкой — статус-бар с тёмными иконками
-    com.vkasport.app.ui.theme.SystemBarsAppearance(statusBarColor = White, darkIcons = true)
 
     LaunchedEffect(Unit) { viewModel.loadPlannedWorkouts() }
 

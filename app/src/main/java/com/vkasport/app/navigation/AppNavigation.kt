@@ -5,10 +5,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import com.vkasport.app.data.local.database.AppDatabaseProvider
 import com.vkasport.app.ui.calendar.CalendarScreen
 import com.vkasport.app.ui.info.InfoScreen
 import com.vkasport.app.ui.records.WorkoutArchiveScreen
@@ -16,20 +13,18 @@ import com.vkasport.app.ui.training.TrainingFlowScreen
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.viewmodel.WorkoutViewModel
 
-// ИЗМЕНЕНО: раньше здесь был NavHost с 4 отдельными route ("training",
-// "records", "calendar", "info") и переключение между ними происходило
-// только по тапу на нижнюю навигацию. Теперь это HorizontalPager — те же
-// 4 экрана, но между ними можно ещё и свайпать пальцем вбок, как просили.
+// ИЗМЕНЕНО: TrainingSessionViewModel больше НЕ создаётся здесь — он
+// создаётся в MainScreen.kt и передаётся сюда параметром. Причина:
+// MainScreen теперь централизованно управляет статус-баром и ему нужен
+// доступ к state.currentScreen тренировки. Инстанс по-прежнему один на
+// всё приложение.
 @Composable
 fun AppNavigation(
     viewModel: WorkoutViewModel,
+    trainingViewModel: TrainingSessionViewModel,
     pagerState: PagerState,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-
-    val database = remember { AppDatabaseProvider.getDatabase(context) }
-    val trainingViewModel = remember { TrainingSessionViewModel(database) }
 
     LaunchedEffect(trainingViewModel) {
         trainingViewModel.loadArchiveFromDatabase()

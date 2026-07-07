@@ -116,8 +116,6 @@ fun InfoScreen(viewModel: TrainingSessionViewModel) {
     var planningDay by remember { mutableStateOf<ProgramDay?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Экран всегда с белой шапкой — статус-бар с тёмными иконками
-    com.vkasport.app.ui.theme.SystemBarsAppearance(statusBarColor = White, darkIcons = true)
 
     Column(Modifier.fillMaxSize().background(White)) {
         Row(Modifier.fillMaxWidth().background(White).padding(horizontal = 20.dp)) {
