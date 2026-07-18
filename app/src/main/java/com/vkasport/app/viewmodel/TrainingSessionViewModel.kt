@@ -17,6 +17,11 @@ import com.vkasport.app.data.local.entity.*
 import org.json.JSONArray
 import org.json.JSONObject
 import com.vkasport.app.notifications.ReminderScheduler
+import com.vkasport.app.data.backup.BackupManager
+import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewModel() {
 
@@ -471,4 +476,53 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     fun getCurrentExercisesCount() = _state.value.selectedExercises.size
     fun getCurrentSetsCount()      = _state.value.selectedExercises.sumOf { it.sets.size }
     fun getCurrentVolume()         = _state.value.selectedExercises.sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }.toFloat()
+
+    // ==================== БЭКАП / ВОССТАНОВЛЕНИЕ ====================
+
+    /** Сохраняет все данные в файл, выбранный пользователем (SAF-uri). */
+    fun exportBackup(context: Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val json = BackupManager.exportJson(database)
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: throw IllegalStateException("Не удалось открыть файл для записи")
+                }
+                onResult(true, "Бэкап сохранён")
+            } catch (e: Exception) {
+                onResult(false, "Ошибка сохранения: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Восстанавливает данные из файла бэкапа. ЗАМЕНЯЕТ все текущие данные
+     * (архив, рекорды, план, свои упражнения, черновик тренировки).
+     */
+    fun importBackup(context: Context, uri: Uri, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val json = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                } ?: throw IllegalStateException("Не удалось открыть файл")
+
+                BackupManager.importJson(database, json)
+
+                // Полная перезагрузка всего состояния из восстановленной БД
+                _restTimerStart.value = null
+                setState(CurrentWorkoutState())
+                loadArchiveFromDatabase()
+                loadRecordsFromDatabase()
+                loadCustomExercises()
+                loadPlannedWorkouts()
+
+                onResult(true, "Данные восстановлены")
+            } catch (e: IllegalArgumentException) {
+                onResult(false, e.message ?: "Неверный формат файла")
+            } catch (e: Exception) {
+                onResult(false, "Ошибка восстановления: ${e.message}")
+            }
+        }
+    }
 }
