@@ -35,36 +35,31 @@ fun MainScreen(
     viewModel: WorkoutViewModel
 ) {
 
+    // ДОБАВЛЕНО (этап «профиль»): 5-я вкладка Profile
     val items = listOf(
         BottomNavItem.Training,
         BottomNavItem.Records,
         BottomNavItem.Calendar,
-        BottomNavItem.Info
+        BottomNavItem.Info,
+        BottomNavItem.Profile
     )
 
-    // ИЗМЕНЕНО: раньше здесь был NavController с 4 route. Теперь состояние
-    // текущей вкладки хранит PagerState — он же используется и для свайпа,
-    // и для подсветки нижней навигации, так что оба способа переключения
-    // (тап и свайп) всегда синхронизированы между собой.
+    // Состояние текущей вкладки хранит PagerState — он же используется и для
+    // свайпа, и для подсветки нижней навигации, всегда синхронизированы.
     val pagerState = rememberPagerState(pageCount = { items.size })
     val coroutineScope = rememberCoroutineScope()
 
-    // ИЗМЕНЕНО: TrainingSessionViewModel теперь создаётся здесь (раньше — в
-    // AppNavigation), потому что MainScreen — единственное место, которое
-    // одновременно знает и текущую вкладку Pager, и текущий под-экран
-    // тренировки. Значит только здесь можно принять ЕДИНСТВЕННОЕ решение
-    // о цвете статус-бара, без гонок между экранами.
+    // TrainingSessionViewModel создаётся здесь (единственное место, которое
+    // одновременно знает вкладку Pager и под-экран тренировки — только здесь
+    // можно принять ЕДИНСТВЕННОЕ решение о цвете статус-бара, без гонок).
     val context = LocalContext.current
     val database = remember { AppDatabaseProvider.getDatabase(context) }
     val trainingViewModel = remember { TrainingSessionViewModel(database) }
     val trainingState by trainingViewModel.state.collectAsState()
 
     // ЕДИНСТВЕННЫЙ источник правды для статус-бара во всём приложении.
-    // Раньше каждый экран вызывал SystemBarsAppearance сам, но
-    // HorizontalPager компонует соседние страницы во время свайпа —
-    // их вызовы конкурировали друг с другом, побеждал случайный.
     // Вкладка 0 (тренировка): все под-экраны чёрные, кроме "muscles".
-    // Вкладки 1–3 (рекорды/календарь/инфо): всегда белые.
+    // Вкладки 1–4 (рекорды/календарь/инфо/профиль): всегда белые.
     val isBlackBar = pagerState.currentPage == 0 && trainingState.currentScreen != "muscles"
     val barColor = if (isBlackBar) Black else White
     SystemBarsAppearance(darkIcons = !isBlackBar)
@@ -94,12 +89,8 @@ fun MainScreen(
         }
 
         // Полоса-подложка под системными иконками (время/батарея).
-        // Начиная с API 35 (у нас targetSdk 36) window.statusBarColor
-        // ИГНОРИРУЕТСЯ системой — цвет статус-бара может нарисовать только
-        // само приложение. Контент экранов начинается НИЖЕ статус-бара
-        // (Scaffold-padding), поэтому раньше полоса всегда оставалась белой
-        // (фон Scaffold), а на чёрных экранах тренировки иконки были
-        // светлыми — светлое на белом и есть «пропавшие» иконки.
+        // С API 35 window.statusBarColor игнорируется системой — цвет
+        // статус-бара может нарисовать только само приложение.
         Box(
             Modifier
                 .align(Alignment.TopCenter)

@@ -19,4 +19,7 @@ sealed class BottomNavItem(
     object Calendar : BottomNavItem("calendar", "Календарь", Icons.Default.CalendarMonth)
 
     object Info : BottomNavItem("info", "Инфо", Icons.Default.Info)
+
+    // ДОБАВЛЕНО (этап «профиль»): 5-я вкладка
+    object Profile : BottomNavItem("profile", "Профиль", Icons.Default.Person)
 }

@@ -8,16 +8,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import com.vkasport.app.ui.calendar.CalendarScreen
 import com.vkasport.app.ui.info.InfoScreen
+import com.vkasport.app.ui.profile.ProfileScreen
 import com.vkasport.app.ui.records.WorkoutArchiveScreen
 import com.vkasport.app.ui.training.TrainingFlowScreen
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.viewmodel.WorkoutViewModel
 
-// ИЗМЕНЕНО: TrainingSessionViewModel больше НЕ создаётся здесь — он
-// создаётся в MainScreen.kt и передаётся сюда параметром. Причина:
-// MainScreen теперь централизованно управляет статус-баром и ему нужен
-// доступ к state.currentScreen тренировки. Инстанс по-прежнему один на
-// всё приложение.
+// TrainingSessionViewModel создаётся в MainScreen.kt и передаётся сюда
+// параметром (MainScreen централизованно управляет статус-баром).
+// Инстанс один на всё приложение.
 @Composable
 fun AppNavigation(
     viewModel: WorkoutViewModel,
@@ -42,7 +41,6 @@ fun AppNavigation(
 
             1 -> {
                 // Обновляем архив/рекорды при каждом заходе на вкладку
-                // (например, после только что завершённой тренировки)
                 LaunchedEffect(Unit) {
                     trainingViewModel.loadArchiveFromDatabase()
                     trainingViewModel.loadRecordsFromDatabase()
@@ -53,6 +51,9 @@ fun AppNavigation(
             2 -> CalendarScreen(viewModel = trainingViewModel)
 
             3 -> InfoScreen(viewModel = trainingViewModel)
+
+            // ДОБАВЛЕНО (этап «профиль»): 5-я вкладка
+            4 -> ProfileScreen(viewModel = trainingViewModel)
         }
     }
 }
