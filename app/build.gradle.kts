@@ -38,6 +38,13 @@ android {
     }
 }
 
+// Room: выгрузка JSON-снимка схемы БД в app/schemas при каждой сборке.
+// Эти файлы не удалять — по ним пишутся и проверяются миграции
+// (см. Migrations.kt). Появятся после первой сборки.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
