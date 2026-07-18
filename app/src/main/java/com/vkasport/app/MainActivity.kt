@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import android.graphics.Color as AndroidColor
 import com.vkasport.app.data.local.database.AppDatabaseProvider
+import com.vkasport.app.notifications.ReminderScheduler
 import com.vkasport.app.data.repository.WorkoutRepository
 import com.vkasport.app.ui.main.MainScreen
 import com.vkasport.app.ui.theme.VKASPORTTheme
@@ -55,6 +56,13 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
+
+        // Планировщик напоминаний: единожды передаём application context,
+        // дальше им пользуется ViewModel. Плюс ежедневная проверка
+        // «не было тренировок больше 2 дней» (~19:00, живёт в WorkManager,
+        // переживает перезагрузку телефона).
+        ReminderScheduler.init(applicationContext)
+        ReminderScheduler.ensureDailyInactivityCheck()
 
         val db = AppDatabaseProvider.getDatabase(this)
 

@@ -16,6 +16,7 @@ import com.vkasport.app.data.local.database.WorkoutDatabase
 import com.vkasport.app.data.local.entity.*
 import org.json.JSONArray
 import org.json.JSONObject
+import com.vkasport.app.notifications.ReminderScheduler
 
 class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewModel() {
 
@@ -396,6 +397,8 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 PlannedWorkoutEntity(date = date.toEpochDay(), hour = hour, minute = minute, muscleGroup = muscleGroup)
             )
             exercises.forEach { database.plannedWorkoutDao().insertExercise(PlannedExerciseEntity(workoutId = id, exerciseName = it)) }
+            // Ставим напоминания: утром 9:00 в день тренировки + за 2 часа
+            ReminderScheduler.schedulePlanned(id, date, hour, minute, muscleGroup)
             loadPlannedWorkouts()
         }
     }
@@ -404,6 +407,8 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         viewModelScope.launch {
             database.plannedWorkoutDao().deleteExercisesByWorkout(id)
             database.plannedWorkoutDao().deleteById(id)
+            // Снимаем оба напоминания этой тренировки
+            ReminderScheduler.cancelPlanned(id)
             loadPlannedWorkouts()
         }
     }
