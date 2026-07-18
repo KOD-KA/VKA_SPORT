@@ -6,10 +6,10 @@ import com.vkasport.app.data.local.dao.*
 import com.vkasport.app.data.local.entity.*
 
 /**
- * ПРАВИЛА ИЗМЕНЕНИЯ СХЕМЫ БД (с этапа «миграции» данные больше не сбрасываются):
+ * ПРАВИЛА ИЗМЕНЕНИЯ СХЕМЫ БД (данные не сбрасываются):
  *
  * 1. Меняешь entity (новая колонка/таблица) → повышаешь version на +1
- * 2. СРАЗУ ЖЕ пишешь миграцию в Migrations.kt (MIGRATION_14_15 и т.д.)
+ * 2. СРАЗУ ЖЕ пишешь миграцию в Migrations.kt (MIGRATION_15_16 и т.д.)
  *    и добавляешь её в ALL_MIGRATIONS — иначе приложение упадёт при
  *    первом же запуске после обновления
  * 3. Старые миграции НИКОГДА не редактируются — только добавляются новые
@@ -30,10 +30,11 @@ import com.vkasport.app.data.local.entity.*
         CustomExerciseEntity::class,
         InProgressWorkoutEntity::class
     ],
-    version = 14,          // 13 -> 14: notes в completed_workouts + таблица in_progress_workout
-    // ИЗМЕНЕНО: true — Room при каждой сборке сохраняет JSON-снимок схемы
-    // в app/schemas/ (путь задан в build.gradle.kts). Версия 14 —
-    // «базовая»: от неё пишутся все будущие миграции.
+    // 14 -> 15: модель упражнений v2 — типы измерений (MeasureType):
+    //   custom_exercises.measureType, completed_workout_exercises.measureType,
+    //   completed_workout_sets.{seconds,distanceKm,load,speed},
+    //   exercise_history.{measureType,bestSeconds,bestDistanceKm}
+    version = 15,
     exportSchema = true
 )
 abstract class WorkoutDatabase : RoomDatabase() {

@@ -3,5 +3,8 @@ package com.vkasport.app.data.model
 data class CustomExercise(
     val id: Long = 0,
     val name: String,
-    val muscleGroup: MuscleGroup
+    val muscleGroup: MuscleGroup,
+    // ДОБАВЛЕНО (модель v2): как считается упражнение (выбирается в
+    // выпадающем меню при создании). Старые свои упражнения — WEIGHT_REPS.
+    val measureType: MeasureType = MeasureType.WEIGHT_REPS
 )

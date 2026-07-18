@@ -100,11 +100,16 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
             val obj = JSONObject()
             obj.put("name", ex.name)
             obj.put("muscleGroup", ex.muscleGroup?.name ?: JSONObject.NULL)
+            obj.put("measureType", ex.measureType.name)
             val setsArr = JSONArray()
             ex.sets.forEach { s ->
                 val sObj = JSONObject()
                 sObj.put("weight", s.weight.toDouble())
                 sObj.put("reps", s.reps)
+                s.seconds?.let { sObj.put("seconds", it) }
+                s.distanceKm?.let { sObj.put("distanceKm", it.toDouble()) }
+                s.load?.let { sObj.put("load", it.toDouble()) }
+                s.speed?.let { sObj.put("speed", it.toDouble()) }
                 setsArr.put(sObj)
             }
             obj.put("sets", setsArr)
@@ -123,17 +128,26 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 val name = obj.getString("name")
                 val groupStr = if (obj.isNull("muscleGroup")) null else obj.getString("muscleGroup")
                 val group = groupStr?.let { s -> MuscleGroup.entries.find { it.name == s } }
+                val measureType = obj.optString("measureType", "")
+                    .let { s -> MeasureType.entries.find { it.name == s } } ?: MeasureType.WEIGHT_REPS
                 val setsArr = obj.getJSONArray("sets")
                 val sets = mutableListOf<WorkoutSet>()
                 for (j in 0 until setsArr.length()) {
                     val sObj = setsArr.getJSONObject(j)
-                    sets.add(WorkoutSet(weight = sObj.getDouble("weight").toFloat(), reps = sObj.getInt("reps")))
+                    sets.add(WorkoutSet(
+                        weight = sObj.getDouble("weight").toFloat(),
+                        reps = sObj.getInt("reps"),
+                        seconds = if (sObj.has("seconds")) sObj.getInt("seconds") else null,
+                        distanceKm = if (sObj.has("distanceKm")) sObj.getDouble("distanceKm").toFloat() else null,
+                        load = if (sObj.has("load")) sObj.getDouble("load").toFloat() else null,
+                        speed = if (sObj.has("speed")) sObj.getDouble("speed").toFloat() else null
+                    ))
                 }
                 // id НЕ сохраняем/восстанавливаем — при восстановлении
                 // каждый WorkoutExercise получает свежий UUID автоматически,
                 // это нормально: id важен только для UI-ключей в рамках
                 // текущей композиции, не для истории
-                list.add(WorkoutExercise(name = name, muscleGroup = group, sets = sets))
+                list.add(WorkoutExercise(name = name, muscleGroup = group, sets = sets, measureType = measureType))
             }
             list
         } catch (e: Exception) {
@@ -151,8 +165,26 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // уникальный id (см. WorkoutExercise), используемый как ключ в списке.
     fun addExercise(name: String) {
         val group = _state.value.selectedMuscleGroup ?: return
-        val exercise = WorkoutExercise(name = name, muscleGroup = group)
+        val exercise = WorkoutExercise(
+            name = name,
+            muscleGroup = group,
+            measureType = resolveMeasureType(name, group)
+        )
         setState(_state.value.copy(selectedExercises = _state.value.selectedExercises + exercise))
+    }
+
+    /**
+     * Как считается упражнение с таким именем: ищем в библиотеке, потом в
+     * своих упражнениях. Не нашли — классика WEIGHT_REPS.
+     */
+    private fun resolveMeasureType(name: String, group: MuscleGroup?): MeasureType {
+        ExerciseLibrary.exercises.find {
+            it.name.equals(name, ignoreCase = true) && (group == null || it.muscleGroup == group)
+        }?.let { return it.measureType }
+        _customExercises.value.find {
+            it.name.equals(name, ignoreCase = true) && (group == null || it.muscleGroup == group)
+        }?.let { return it.measureType }
+        return MeasureType.WEIGHT_REPS
     }
 
     // Убрать КОНКРЕТНЫЙ экземпляр упражнения (по id, не по имени — иначе
@@ -235,7 +267,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         val alreadyAdded = _state.value.selectedExercises.map { it.name }.toSet()
         val toAdd = lastWithGroup.exercises
             .filter { it.muscleGroup == group && it.name !in alreadyAdded }
-            .map { WorkoutExercise(name = it.name, muscleGroup = group) }
+            .map { WorkoutExercise(name = it.name, muscleGroup = group, measureType = it.measureType) }
 
         if (toAdd.isEmpty()) return
         setState(_state.value.copy(selectedExercises = _state.value.selectedExercises + toAdd))
@@ -272,10 +304,16 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                     CompletedWorkoutExerciseEntity(
                         workoutId = wid,
                         exerciseName = ex.name,
-                        muscleGroup = ex.muscleGroup?.name
+                        muscleGroup = ex.muscleGroup?.name,
+                        measureType = ex.measureType.name
                     )
                 )
-                ex.sets.forEach { set -> database.completedWorkoutSetDao().insert(CompletedWorkoutSetEntity(workoutId = wid, exerciseName = ex.name, weight = set.weight, reps = set.reps)) }
+                ex.sets.forEach { set -> database.completedWorkoutSetDao().insert(CompletedWorkoutSetEntity(
+                    workoutId = wid, exerciseName = ex.name,
+                    weight = set.weight, reps = set.reps,
+                    seconds = set.seconds, distanceKm = set.distanceKm,
+                    load = set.load, speed = set.speed
+                )) }
             }
             database.inProgressWorkoutDao().clear()
             _lastCompletedWorkoutId.value = wid
@@ -362,7 +400,11 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                         WorkoutExercise(
                             name = ex.exerciseName,
                             muscleGroup = ex.muscleGroup?.let { name -> MuscleGroup.entries.find { it.name == name } },
-                            sets = (allSets[ex.exerciseName] ?: emptyList()).map { WorkoutSet(it.weight, it.reps) }
+                            measureType = ex.measureType?.let { mt -> MeasureType.entries.find { it.name == mt } }
+                                ?: MeasureType.WEIGHT_REPS,
+                            sets = (allSets[ex.exerciseName] ?: emptyList()).map {
+                                WorkoutSet(it.weight, it.reps, it.seconds, it.distanceKm, it.load, it.speed)
+                            }
                         )
                     }
                 )
@@ -424,12 +466,16 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         viewModelScope.launch {
             _customExercises.value = database.customExerciseDao().getAll().mapNotNull { e ->
                 val group = MuscleGroup.entries.find { it.name == e.muscleGroup } ?: return@mapNotNull null
-                CustomExercise(id = e.id, name = e.name, muscleGroup = group)
+                CustomExercise(
+                    id = e.id, name = e.name, muscleGroup = group,
+                    measureType = e.measureType?.let { mt -> MeasureType.entries.find { it.name == mt } }
+                        ?: MeasureType.WEIGHT_REPS
+                )
             }
         }
     }
 
-    fun addCustomExercise(name: String, group: MuscleGroup) {
+    fun addCustomExercise(name: String, group: MuscleGroup, measureType: MeasureType = MeasureType.WEIGHT_REPS) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         val alreadyExists = _customExercises.value.any {
@@ -441,7 +487,9 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         if (alreadyExists || existsInLibrary) return
 
         viewModelScope.launch {
-            database.customExerciseDao().insert(CustomExerciseEntity(name = trimmed, muscleGroup = group.name))
+            database.customExerciseDao().insert(CustomExerciseEntity(
+                name = trimmed, muscleGroup = group.name, measureType = measureType.name
+            ))
             loadCustomExercises()
         }
     }

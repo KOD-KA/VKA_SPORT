@@ -67,7 +67,8 @@ object ExerciseLibrary {
         // ===== ПРЕСС =====
         ExerciseCatalog("Скручивания",                     MuscleGroup.ABS),
         ExerciseCatalog("Подъем ног в висе",               MuscleGroup.ABS),
-        ExerciseCatalog("Планка",                           MuscleGroup.ABS),
+        // ИЗМЕНЕНО (модель v2): планка считается ВРЕМЕНЕМ удержания
+        ExerciseCatalog("Планка",                           MuscleGroup.ABS, MeasureType.TIME),
         ExerciseCatalog("Скручивания на блоке",            MuscleGroup.ABS),
         ExerciseCatalog("Русские скручивания",             MuscleGroup.ABS),
         ExerciseCatalog("Велосипед",                        MuscleGroup.ABS),
@@ -77,22 +78,25 @@ object ExerciseLibrary {
         ExerciseCatalog("Сгибание запястий со штангой",   MuscleGroup.FOREARMS),
         ExerciseCatalog("Разгибание запястий со штангой", MuscleGroup.FOREARMS),
         ExerciseCatalog("Сгибание запястий с гантелями",  MuscleGroup.FOREARMS),
-        ExerciseCatalog("Удержание штанги на время",       MuscleGroup.FOREARMS),
-        ExerciseCatalog("Кистевой эспандер",               MuscleGroup.FOREARMS),
+        // ИЗМЕНЕНО (модель v2): удержание — время
+        ExerciseCatalog("Удержание штанги на время",       MuscleGroup.FOREARMS, MeasureType.TIME),
+        ExerciseCatalog("Кистевой эспандер",               MuscleGroup.FOREARMS, MeasureType.REPS),
 
         // ===== ШЕЯ =====
         ExerciseCatalog("Наклоны головы с сопротивлением", MuscleGroup.NECK),
-        ExerciseCatalog("Круговые движения шеей",          MuscleGroup.NECK),
+        ExerciseCatalog("Круговые движения шеей",          MuscleGroup.NECK, MeasureType.REPS),
         ExerciseCatalog("Подъем головы лёжа",              MuscleGroup.NECK),
 
         // ===== РАСТЯЖКА =====
-        ExerciseCatalog("Растяжка грудных мышц",           MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка спины (кошка-корова)",   MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка квадрицепса",            MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка задней поверхности бедра", MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка плеч",                    MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка трицепса",                MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка икроножных мышц",         MuscleGroup.STRETCH),
-        ExerciseCatalog("Растяжка бицепса",                 MuscleGroup.STRETCH)
+        // ИЗМЕНЕНО (модель v2): вся растяжка — ВРЕМЯ удержания, а не вес×повторы
+        // (закрывает старую известную проблему из handoff-документа)
+        ExerciseCatalog("Растяжка грудных мышц",           MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка спины (кошка-корова)",   MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка квадрицепса",            MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка задней поверхности бедра", MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка плеч",                    MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка трицепса",                MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка икроножных мышц",         MuscleGroup.STRETCH, MeasureType.TIME),
+        ExerciseCatalog("Растяжка бицепса",                 MuscleGroup.STRETCH, MeasureType.TIME)
     )
 }

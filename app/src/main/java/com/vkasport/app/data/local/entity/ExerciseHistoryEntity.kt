@@ -18,5 +18,11 @@ data class ExerciseHistoryEntity(
     val athleteWeight: Float? = null,
     // Подход, давший лучший объём
     val bestVolumeWeight: Float? = null,
-    val bestVolumeReps: Int? = null
+    val bestVolumeReps: Int? = null,
+
+    // ДОБАВЛЕНО (модель v2, миграция 14->15) — рекорды для новых типов
+    // упражнений (заполняются со следующего под-этапа). Null = WEIGHT_REPS.
+    val measureType: String? = null,
+    val bestSeconds: Int? = null,      // лучшее время (TIME)
+    val bestDistanceKm: Float? = null  // лучшая дистанция (DISTANCE)
 )

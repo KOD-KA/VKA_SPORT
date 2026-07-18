@@ -12,5 +12,12 @@ data class CompletedWorkoutSetEntity(
     val exerciseName: String,
 
     val weight: Float,
-    val reps: Int
+    val reps: Int,
+
+    // ДОБАВЛЕНО (модель v2, миграция 14->15) — поля для новых типов
+    // упражнений. Null для классических вес×повторы.
+    val seconds: Int? = null,      // время (TIME / DISTANCE / CARDIO)
+    val distanceKm: Float? = null, // дистанция (DISTANCE)
+    val load: Float? = null,       // нагрузка тренажёра (CARDIO)
+    val speed: Float? = null       // скорость км/ч (CARDIO)
 )

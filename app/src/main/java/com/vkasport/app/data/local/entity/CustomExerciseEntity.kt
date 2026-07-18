@@ -9,5 +9,9 @@ data class CustomExerciseEntity(
     val name: String,
     // Хранится как MuscleGroup.name (стабильный ключ enum), не как
     // локализованный title, чтобы не сломаться при смене текста.
-    val muscleGroup: String
+    val muscleGroup: String,
+    // ДОБАВЛЕНО (модель v2, миграция 14->15): MeasureType.name.
+    // Nullable СПЕЦИАЛЬНО (null = WEIGHT_REPS): колонка без DEFAULT-значения,
+    // чтобы не связываться с проверкой default'ов при валидации миграций Room.
+    val measureType: String? = null
 )
