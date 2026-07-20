@@ -22,7 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vkasport.app.data.model.MeasureType
 import com.vkasport.app.data.model.MuscleGroup
+import com.vkasport.app.ui.common.SetFormat
 import com.vkasport.app.data.model.WorkoutExercise
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.ui.theme.Black
@@ -276,37 +278,82 @@ private fun InlineExerciseBlock(
     var editingIndex by remember(exercise.id) { mutableStateOf<Int?>(null) }
     var weightInput by remember(exercise.id) { mutableStateOf("") }
     var repsInput by remember(exercise.id) { mutableStateOf("") }
+    // Поля для новых типов упражнений (модель v2)
+    var minInput by remember(exercise.id) { mutableStateOf("") }
+    var secInput by remember(exercise.id) { mutableStateOf("") }
+    var kmInput by remember(exercise.id) { mutableStateOf("") }
+    var loadInput by remember(exercise.id) { mutableStateOf("") }
+    var speedInput by remember(exercise.id) { mutableStateOf("") }
+
+    fun clearInputs() {
+        weightInput = ""; repsInput = ""; minInput = ""; secInput = ""
+        kmInput = ""; loadInput = ""; speedInput = ""
+    }
 
     val focusManager = LocalFocusManager.current
     val repsFocusRequester = remember(exercise.id) { FocusRequester() }
 
     fun openAddForm() {
         editingIndex = null
-        weightInput = ""
-        repsInput = ""
+        clearInputs()
         addingSet = true
     }
 
     fun openEditForm(index: Int, set: com.vkasport.app.data.model.WorkoutSet) {
         addingSet = false
         editingIndex = index
-        weightInput = formatW(set.weight)
-        repsInput = set.reps.toString()
+        weightInput = if (set.weight > 0f) formatW(set.weight) else ""
+        repsInput = if (set.reps > 0) set.reps.toString() else ""
+        minInput = set.seconds?.let { (it / 60).toString() } ?: ""
+        secInput = set.seconds?.let { (it % 60).toString() } ?: ""
+        kmInput = set.distanceKm?.let { formatW(it) } ?: ""
+        loadInput = set.load?.let { formatW(it) } ?: ""
+        speedInput = set.speed?.let { formatW(it) } ?: ""
     }
 
     // ИСПРАВЛЕНО: передаём exercise.id (уникальный id экземпляра), а не
     // exercise.name — ViewModel ищет упражнение по id, поиск по имени
     // никогда не находил совпадения и подход просто не сохранялся
     fun confirmForm() {
-        val w = weightInput.replace(",", ".").toFloatOrNull() ?: return
-        val r = repsInput.toIntOrNull() ?: return
+        // Собираем подход в зависимости от типа упражнения.
+        // return внутри ветки = не все обязательные поля заполнены.
+        val newSet: com.vkasport.app.data.model.WorkoutSet = when (exercise.measureType) {
+            MeasureType.WEIGHT_REPS -> {
+                // Вес МОЖНО оставить пустым — это «без доп. веса» (вес 0)
+                val w = weightInput.replace(",", ".").toFloatOrNull() ?: 0f
+                val r = repsInput.toIntOrNull() ?: return
+                com.vkasport.app.data.model.WorkoutSet(weight = w, reps = r)
+            }
+            MeasureType.REPS -> {
+                val r = repsInput.toIntOrNull() ?: return
+                com.vkasport.app.data.model.WorkoutSet(reps = r)
+            }
+            MeasureType.TIME -> {
+                val total = (minInput.toIntOrNull() ?: 0) * 60 + (secInput.toIntOrNull() ?: 0)
+                if (total <= 0) return
+                com.vkasport.app.data.model.WorkoutSet(seconds = total)
+            }
+            MeasureType.DISTANCE -> {
+                val km = kmInput.replace(",", ".").toFloatOrNull() ?: return
+                val total = (minInput.toIntOrNull() ?: 0) * 60 + (secInput.toIntOrNull() ?: 0)
+                com.vkasport.app.data.model.WorkoutSet(distanceKm = km, seconds = total)
+            }
+            MeasureType.CARDIO -> {
+                val m = minInput.toIntOrNull() ?: return
+                com.vkasport.app.data.model.WorkoutSet(
+                    load = loadInput.replace(",", ".").toFloatOrNull(),
+                    speed = speedInput.replace(",", ".").toFloatOrNull(),
+                    seconds = m * 60
+                )
+            }
+        }
         val idx = editingIndex
         if (idx != null) {
-            viewModel.updateSet(exercise.id, idx, w, r)
+            viewModel.updateSet(exercise.id, idx, newSet)
         } else {
-            viewModel.addSetToExercise(exercise.id, w, r)
+            viewModel.addSetToExercise(exercise.id, newSet)
         }
-        weightInput = ""; repsInput = ""
+        clearInputs()
         addingSet = false; editingIndex = null
         focusManager.clearFocus()
     }
@@ -389,10 +436,11 @@ private fun InlineExerciseBlock(
 
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = previousSet?.let { "${formatW(it.weight)} × ${it.reps}" } ?: "—",
+                            text = previousSet?.let { SetFormat.value(exercise.measureType, it) } ?: "—",
                             color = DarkGray, fontSize = 14.sp
                         )
-                        if (previousSet != null && viewModel.isExerciseRecord(exercise.name, previousSet.weight, previousSet.reps)) {
+                        if (previousSet != null && exercise.measureType == MeasureType.WEIGHT_REPS &&
+                            viewModel.isExerciseRecord(exercise.name, previousSet.weight, previousSet.reps)) {
                             Spacer(Modifier.width(4.dp))
                             Text("🏆", fontSize = 11.sp)
                         }
@@ -407,8 +455,9 @@ private fun InlineExerciseBlock(
                                 modifier = Modifier.clickable { openEditForm(index, currentSet) },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("${formatW(currentSet.weight)} × ${currentSet.reps}", color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                if (viewModel.isExerciseRecord(exercise.name, currentSet.weight, currentSet.reps)) {
+                                Text(SetFormat.value(exercise.measureType, currentSet), color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                if (exercise.measureType == MeasureType.WEIGHT_REPS &&
+                                    viewModel.isExerciseRecord(exercise.name, currentSet.weight, currentSet.reps)) {
                                     Spacer(Modifier.width(4.dp))
                                     Text("🏆", fontSize = 11.sp)
                                 }
@@ -447,29 +496,52 @@ private fun InlineExerciseBlock(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    OutlinedTextField(
-                        value = weightInput, onValueChange = { weightInput = it },
-                        label = { Text("кг", color = DarkGray) }, modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { repsFocusRequester.requestFocus() }),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,
-                            focusedTextColor = Black, unfocusedTextColor = Black, focusedLabelColor = Black
-                        )
-                    )
-                    OutlinedTextField(
-                        value = repsInput, onValueChange = { repsInput = it },
-                        label = { Text("повт.", color = DarkGray) },
-                        modifier = Modifier.weight(1f).focusRequester(repsFocusRequester),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { confirmForm() }),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,
-                            focusedTextColor = Black, unfocusedTextColor = Black, focusedLabelColor = Black
-                        )
-                    )
+                    // Набор полей зависит от того, как считается упражнение
+                    when (exercise.measureType) {
+                        MeasureType.WEIGHT_REPS -> {
+                            SetField(weightInput, { weightInput = it }, "кг", "без веса",
+                                KeyboardType.Decimal, ImeAction.Next, { repsFocusRequester.requestFocus() },
+                                Modifier.weight(1f))
+                            SetField(repsInput, { repsInput = it }, "повт.", null,
+                                KeyboardType.Number, ImeAction.Done, { confirmForm() },
+                                Modifier.weight(1f).focusRequester(repsFocusRequester))
+                        }
+                        MeasureType.REPS -> {
+                            SetField(repsInput, { repsInput = it }, "повт.", null,
+                                KeyboardType.Number, ImeAction.Done, { confirmForm() },
+                                Modifier.weight(1f))
+                        }
+                        MeasureType.TIME -> {
+                            SetField(minInput, { minInput = it }, "мин", null,
+                                KeyboardType.Number, ImeAction.Next, { repsFocusRequester.requestFocus() },
+                                Modifier.weight(1f))
+                            SetField(secInput, { secInput = it }, "сек", null,
+                                KeyboardType.Number, ImeAction.Done, { confirmForm() },
+                                Modifier.weight(1f).focusRequester(repsFocusRequester))
+                        }
+                        MeasureType.DISTANCE -> {
+                            SetField(kmInput, { kmInput = it }, "км", null,
+                                KeyboardType.Decimal, ImeAction.Next, { repsFocusRequester.requestFocus() },
+                                Modifier.weight(1f))
+                            SetField(minInput, { minInput = it }, "мин", null,
+                                KeyboardType.Number, ImeAction.Next, {},
+                                Modifier.weight(1f).focusRequester(repsFocusRequester))
+                            SetField(secInput, { secInput = it }, "сек", null,
+                                KeyboardType.Number, ImeAction.Done, { confirmForm() },
+                                Modifier.weight(1f))
+                        }
+                        MeasureType.CARDIO -> {
+                            SetField(loadInput, { loadInput = it }, "нагр.", null,
+                                KeyboardType.Decimal, ImeAction.Next, {},
+                                Modifier.weight(1f))
+                            SetField(speedInput, { speedInput = it }, "км/ч", null,
+                                KeyboardType.Decimal, ImeAction.Next, {},
+                                Modifier.weight(1f))
+                            SetField(minInput, { minInput = it }, "мин", null,
+                                KeyboardType.Number, ImeAction.Done, { confirmForm() },
+                                Modifier.weight(1f))
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .size(56.dp)
@@ -483,4 +555,31 @@ private fun InlineExerciseBlock(
             }
         }
     }
+}
+@Composable
+private fun SetField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String?,
+    keyboardType: KeyboardType,
+    imeAction: ImeAction,
+    onImeAction: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value, onValueChange = onValueChange,
+        label = { Text(label, color = DarkGray) },
+        placeholder = placeholder?.let { p ->
+            { Text(p, color = DarkGray.copy(alpha = 0.6f), fontSize = 12.sp) }
+        },
+        modifier = modifier,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        keyboardActions = KeyboardActions(onNext = { onImeAction() }, onDone = { onImeAction() }),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Black, unfocusedBorderColor = SoftGray, cursorColor = Black,
+            focusedTextColor = Black, unfocusedTextColor = Black, focusedLabelColor = Black
+        )
+    )
 }

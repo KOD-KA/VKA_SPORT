@@ -163,12 +163,14 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // несколько раз за тренировку — например жим лёжа → другое упражнение →
     // снова жим лёжа. Крашей не будет, т.к. у каждого экземпляра свой
     // уникальный id (см. WorkoutExercise), используемый как ключ в списке.
-    fun addExercise(name: String) {
+    fun addExercise(name: String, measureTypeOverride: MeasureType? = null) {
         val group = _state.value.selectedMuscleGroup ?: return
         val exercise = WorkoutExercise(
             name = name,
             muscleGroup = group,
-            measureType = resolveMeasureType(name, group)
+            // override нужен для только что созданного своего упражнения:
+            // его тип может ещё не успеть загрузиться из БД в customExercises
+            measureType = measureTypeOverride ?: resolveMeasureType(name, group)
         )
         setState(_state.value.copy(selectedExercises = _state.value.selectedExercises + exercise))
     }
@@ -212,14 +214,19 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         setState(_state.value.copy(currentScreen = s))
     }
 
-    // Добавить подход КОНКРЕТНОМУ экземпляру упражнения (по id)
-    fun addSetToExercise(exerciseId: String, weight: Float, reps: Int) {
+    // Старый вариант (вес×повторы) — делегирует общему, сохранён для
+    // совместимости вызовов
+    fun addSetToExercise(exerciseId: String, weight: Float, reps: Int) =
+        addSetToExercise(exerciseId, WorkoutSet(weight, reps))
+
+    // МОДЕЛЬ V2: добавить подход ЛЮБОГО типа конкретному экземпляру (по id)
+    fun addSetToExercise(exerciseId: String, set: WorkoutSet) {
         val target = _state.value.selectedExercises.find { it.id == exerciseId } ?: return
         val updated = _state.value.selectedExercises.map { ex ->
-            if (ex.id == exerciseId) ex.copy(sets = ex.sets + WorkoutSet(weight, reps)) else ex
+            if (ex.id == exerciseId) ex.copy(sets = ex.sets + set) else ex
         }
         setState(_state.value.copy(selectedExercises = updated))
-        updateExerciseStats(target.name, weight, reps)
+        updateStatsForSet(target, set)
         // Записан новый подход — таймер отдыха начинает отсчёт заново
         _restTimerStart.value = System.currentTimeMillis()
     }
@@ -227,11 +234,15 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // Редактирование уже введённого подхода — тоже по id экземпляра,
     // чтобы при дублях правился только тот конкретный подход в той
     // конкретной карточке, по которой тапнули
-    fun updateSet(exerciseId: String, index: Int, weight: Float, reps: Int) {
+    fun updateSet(exerciseId: String, index: Int, weight: Float, reps: Int) =
+        updateSet(exerciseId, index, WorkoutSet(weight, reps))
+
+    // МОДЕЛЬ V2: редактирование подхода любого типа
+    fun updateSet(exerciseId: String, index: Int, set: WorkoutSet) {
         val updated = _state.value.selectedExercises.map { ex ->
             if (ex.id == exerciseId && index in ex.sets.indices) {
                 val newSets = ex.sets.toMutableList()
-                newSets[index] = WorkoutSet(weight, reps)
+                newSets[index] = set
                 ex.copy(sets = newSets)
             } else ex
         }
@@ -354,6 +365,53 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     // ==================== EXERCISE STATS ====================
 
+    /**
+     * Обновление рекордов с учётом типа упражнения:
+     *  WEIGHT_REPS — классическая логика (макс. вес / объём)
+     *  REPS        — макс. повторы
+     *  TIME        — лучшее (наибольшее) время
+     *  DISTANCE    — макс. дистанция
+     *  CARDIO      — рекорды не ведутся
+     */
+    private fun updateStatsForSet(target: WorkoutExercise, set: WorkoutSet) {
+        if (target.measureType == MeasureType.WEIGHT_REPS) {
+            updateExerciseStats(target.name, set.weight, set.reps)
+            return
+        }
+        if (target.measureType == MeasureType.CARDIO) return
+
+        val cur = _exerciseHistory.value[target.name]
+        val isNewRecord = when (target.measureType) {
+            MeasureType.REPS     -> set.reps > (cur?.maxReps ?: 0)
+            MeasureType.TIME     -> (set.seconds ?: 0) > (cur?.bestSeconds ?: 0)
+            MeasureType.DISTANCE -> (set.distanceKm ?: 0f) > (cur?.bestDistanceKm ?: 0f)
+            else -> false
+        }
+        if (!isNewRecord) return
+
+        val updated = (cur ?: ExerciseHistory(exerciseName = target.name)).copy(
+            measureType = target.measureType,
+            maxReps = if (target.measureType == MeasureType.REPS) set.reps else cur?.maxReps ?: 0,
+            bestSeconds = if (target.measureType == MeasureType.TIME) set.seconds else cur?.bestSeconds,
+            bestDistanceKm = if (target.measureType == MeasureType.DISTANCE) set.distanceKm else cur?.bestDistanceKm,
+            recordDate = LocalDateTime.now(),
+            athleteWeight = _state.value.athleteWeight
+        )
+        _exerciseHistory.value = _exerciseHistory.value + (target.name to updated)
+        viewModelScope.launch {
+            database.exerciseHistoryDao().save(ExerciseHistoryEntity(
+                exerciseName = updated.exerciseName, maxWeight = updated.maxWeight,
+                maxWeightReps = updated.maxWeightReps, maxReps = updated.maxReps,
+                bestVolume = updated.bestVolume,
+                recordDate = updated.recordDate?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
+                athleteWeight = updated.athleteWeight,
+                bestVolumeWeight = updated.bestVolumeWeight, bestVolumeReps = updated.bestVolumeReps,
+                measureType = updated.measureType.name,
+                bestSeconds = updated.bestSeconds, bestDistanceKm = updated.bestDistanceKm
+            ))
+        }
+    }
+
     fun updateExerciseStats(exerciseName: String, weight: Float, reps: Int) {
         val volume = weight * reps
         val cur = _exerciseHistory.value[exerciseName]
@@ -378,7 +436,9 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 bestVolume = updated.bestVolume,
                 recordDate = updated.recordDate?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
                 athleteWeight = updated.athleteWeight,
-                bestVolumeWeight = updated.bestVolumeWeight, bestVolumeReps = updated.bestVolumeReps
+                bestVolumeWeight = updated.bestVolumeWeight, bestVolumeReps = updated.bestVolumeReps,
+                measureType = updated.measureType.name,
+                bestSeconds = updated.bestSeconds, bestDistanceKm = updated.bestDistanceKm
             ))
         }
     }
@@ -421,7 +481,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                     exerciseName = e.exerciseName, maxWeight = e.maxWeight, maxWeightReps = e.maxWeightReps,
                     maxReps = e.maxReps, bestVolume = e.bestVolume,
                     recordDate = e.recordDate?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDateTime() },
-                    athleteWeight = e.athleteWeight, bestVolumeWeight = e.bestVolumeWeight, bestVolumeReps = e.bestVolumeReps
+                    athleteWeight = e.athleteWeight, bestVolumeWeight = e.bestVolumeWeight, bestVolumeReps = e.bestVolumeReps,
+                    measureType = e.measureType?.let { mt -> MeasureType.entries.find { it.name == mt } }
+                        ?: MeasureType.WEIGHT_REPS,
+                    bestSeconds = e.bestSeconds, bestDistanceKm = e.bestDistanceKm
                 )}
         }
     }

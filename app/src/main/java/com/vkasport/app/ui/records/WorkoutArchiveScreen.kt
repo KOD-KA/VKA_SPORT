@@ -383,11 +383,18 @@ private fun WorkoutDetailSheet(
                 }
                 Column(Modifier.fillMaxWidth().background(White, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
                     .padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    // МОДЕЛЬ V2: колонки «Вес/Повт./Объём» — только для классики;
+                    // для остальных типов одна колонка «Результат»
+                    val isClassic = exercise.measureType == com.vkasport.app.data.model.MeasureType.WEIGHT_REPS
                     Row(Modifier.fillMaxWidth()) {
                         Text("#",      Modifier.width(28.dp), fontSize = 11.sp, color = DarkGray)
-                        Text("Вес",   Modifier.weight(1f),   fontSize = 11.sp, color = DarkGray)
-                        Text("Повт.", Modifier.weight(1f),   fontSize = 11.sp, color = DarkGray)
-                        Text("Объём", Modifier.weight(1f),   fontSize = 11.sp, color = DarkGray)
+                        if (isClassic) {
+                            Text("Вес",   Modifier.weight(1f),   fontSize = 11.sp, color = DarkGray)
+                            Text("Повт.", Modifier.weight(1f),   fontSize = 11.sp, color = DarkGray)
+                            Text("Объём", Modifier.weight(1f),   fontSize = 11.sp, color = DarkGray)
+                        } else {
+                            Text("Результат", Modifier.weight(1f), fontSize = 11.sp, color = DarkGray)
+                        }
                     }
                     Spacer(Modifier.height(4.dp))
                     HorizontalDivider(color = LightGray)
@@ -400,21 +407,27 @@ private fun WorkoutDetailSheet(
                             Row(Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 Text("${idx + 1}", Modifier.width(28.dp), color = Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text("${fmtW(set.weight)} кг", Modifier.weight(1f), color = Black, fontSize = 14.sp)
-                                Text("× ${set.reps}", Modifier.weight(1f), color = Black, fontSize = 14.sp)
-                                Text("${(set.weight * set.reps).toInt()} кг", Modifier.weight(1f), fontSize = 13.sp, color = DarkGray)
+                                if (isClassic) {
+                                    Text(if (set.weight > 0f) "${fmtW(set.weight)} кг" else "без веса", Modifier.weight(1f), color = Black, fontSize = 14.sp)
+                                    Text("× ${set.reps}", Modifier.weight(1f), color = Black, fontSize = 14.sp)
+                                    Text("${(set.weight * set.reps).toInt()} кг", Modifier.weight(1f), fontSize = 13.sp, color = DarkGray)
+                                } else {
+                                    Text(com.vkasport.app.ui.common.SetFormat.value(exercise.measureType, set), Modifier.weight(1f), color = Black, fontSize = 14.sp)
+                                }
                             }
                             if (idx < exercise.sets.lastIndex)
                                 HorizontalDivider(color = SoftGray, thickness = 0.5.dp)
                         }
-                        val exVol = exercise.sets.sumOf { (it.weight * it.reps).toDouble() }.toInt()
-                        val exMax = exercise.sets.maxOf { it.weight }
-                        Spacer(Modifier.height(6.dp))
-                        HorizontalDivider(color = LightGray)
-                        Spacer(Modifier.height(6.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Макс: ${fmtW(exMax)} кг", fontSize = 12.sp, color = DarkGray)
-                            Text("Всего: $exVol кг",         fontSize = 12.sp, color = DarkGray)
+                        if (isClassic) {
+                            val exVol = exercise.sets.sumOf { (it.weight * it.reps).toDouble() }.toInt()
+                            val exMax = exercise.sets.maxOf { it.weight }
+                            Spacer(Modifier.height(6.dp))
+                            HorizontalDivider(color = LightGray)
+                            Spacer(Modifier.height(6.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Макс: ${fmtW(exMax)} кг", fontSize = 12.sp, color = DarkGray)
+                                Text("Всего: $exVol кг",         fontSize = 12.sp, color = DarkGray)
+                            }
                         }
                     }
                 }
