@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +29,8 @@ import com.vkasport.app.data.model.ExerciseHistory
 import com.vkasport.app.data.model.ExerciseLibrary
 import com.vkasport.app.data.model.MeasureType
 import com.vkasport.app.ui.common.SetFormat
+import com.vkasport.app.ui.common.SimpleLineChart
+import java.time.LocalDate
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
@@ -62,12 +65,17 @@ private fun matchesRecord(record: ExerciseHistory, q: String): Boolean {
 //  КОРНЕВОЙ ЭКРАН
 // ═══════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseRecordsScreen(
     viewModel: TrainingSessionViewModel,
     searchQuery: String = ""
 ) {
     val records by viewModel.exerciseHistory.collectAsState()
+    val completedWorkouts by viewModel.completedWorkouts.collectAsState()
+
+    // Рекорд, по которому открыт bottom sheet с графиками прогресса
+    var detailRecord by remember { mutableStateOf<ExerciseHistory?>(null) }
 
     val mainRecords = records.values
         .filter { it.exerciseName in PRIORITY_EXERCISES && matchesRecord(it, searchQuery) }
@@ -87,7 +95,7 @@ fun ExerciseRecordsScreen(
         if (mainRecords.isEmpty()) {
             item { EmptyHint(if (searchQuery.isBlank()) "Выполните тренировки с основными упражнениями" else "Ничего не найдено") }
         } else {
-            items(mainRecords) { RecordCard(it, true) }
+            items(mainRecords) { rec -> RecordCard(rec, true) { detailRecord = rec } }
         }
 
         item { Spacer(Modifier.height(6.dp)) }
@@ -96,7 +104,95 @@ fun ExerciseRecordsScreen(
         if (otherRecords.isEmpty()) {
             item { EmptyHint(if (searchQuery.isBlank()) "Здесь появятся рекорды по другим упражнениям" else "Ничего не найдено") }
         } else {
-            items(otherRecords) { RecordCard(it, false) }
+            items(otherRecords) { rec -> RecordCard(rec, false) { detailRecord = rec } }
+        }
+    }
+
+    // ===== ПРОГРЕСС ПО УПРАЖНЕНИЮ (bottom sheet, тап по карточке) =====
+    detailRecord?.let { rec ->
+        val type = rec.measureType
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val chartDateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yy") }
+
+        // Точки по тренировкам, где встречалось упражнение (по ИМЕНИ —
+        // общая история упражнения). completedWorkouts отсортирован DESC,
+        // для графика сортируем по дате по возрастанию.
+        val mainPoints = remember(rec.exerciseName, completedWorkouts) {
+            completedWorkouts.mapNotNull { w ->
+                val sets = w.exercises.filter { it.name == rec.exerciseName }.flatMap { it.sets }
+                if (sets.isEmpty()) null else {
+                    val v: Float? = when (type) {
+                        MeasureType.WEIGHT_REPS -> sets.maxOf { it.weight }
+                        MeasureType.REPS -> sets.maxOf { it.reps }.toFloat()
+                        MeasureType.TIME -> sets.maxOf { it.seconds ?: 0 }.toFloat()
+                        MeasureType.DISTANCE -> sets.maxOf { it.distanceKm ?: 0f }
+                        MeasureType.CARDIO -> null
+                    }
+                    v?.let { value -> w.dateTime.toLocalDate() to value }
+                }
+            }.sortedBy { it.first }
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { detailRecord = null },
+            sheetState = sheetState,
+            containerColor = White
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 28.dp)
+            ) {
+                Text(
+                    "ПРОГРЕСС: ${rec.exerciseName}",
+                    color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(12.dp))
+
+                val mainTitle = when (type) {
+                    MeasureType.WEIGHT_REPS -> "МАКС. ВЕС ПО ТРЕНИРОВКАМ, КГ"
+                    MeasureType.REPS -> "МАКС. ПОВТОРЫ ПО ТРЕНИРОВКАМ"
+                    MeasureType.TIME -> "ЛУЧШЕЕ ВРЕМЯ ПО ТРЕНИРОВКАМ, СЕК"
+                    MeasureType.DISTANCE -> "ДИСТАНЦИЯ ПО ТРЕНИРОВКАМ, КМ"
+                    MeasureType.CARDIO -> "ПРОГРЕСС"
+                }
+                Column(
+                    Modifier.fillMaxWidth().background(SoftGray, RoundedCornerShape(16.dp)).padding(14.dp)
+                ) {
+                    Text(mainTitle, color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    SimpleLineChart(
+                        values = mainPoints.map { it.second },
+                        startLabel = mainPoints.firstOrNull()?.first?.format(chartDateFmt),
+                        endLabel = mainPoints.lastOrNull()?.first?.format(chartDateFmt)
+                    )
+                }
+
+                // Для классики — второй график: объём за тренировку
+                if (type == MeasureType.WEIGHT_REPS) {
+                    Spacer(Modifier.height(12.dp))
+                    val volumePoints = remember(rec.exerciseName, completedWorkouts) {
+                        completedWorkouts.mapNotNull { w ->
+                            val sets = w.exercises.filter { it.name == rec.exerciseName }.flatMap { it.sets }
+                            if (sets.isEmpty()) null
+                            else w.dateTime.toLocalDate() to
+                                    sets.sumOf { (it.weight * it.reps).toDouble() }.toFloat()
+                        }.sortedBy { it.first }
+                    }
+                    Column(
+                        Modifier.fillMaxWidth().background(SoftGray, RoundedCornerShape(16.dp)).padding(14.dp)
+                    ) {
+                        Text("ОБЪЁМ ЗА ТРЕНИРОВКУ, КГ", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        SimpleLineChart(
+                            values = volumePoints.map { it.second },
+                            startLabel = volumePoints.firstOrNull()?.first?.format(chartDateFmt),
+                            endLabel = volumePoints.lastOrNull()?.first?.format(chartDateFmt)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -106,13 +202,14 @@ fun ExerciseRecordsScreen(
 // ═══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun RecordCard(record: ExerciseHistory, isPrimary: Boolean) {
+private fun RecordCard(record: ExerciseHistory, isPrimary: Boolean, onClick: () -> Unit = {}) {
     val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yy")
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(SoftGray, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
     ) {
         // Шапка
         Box(

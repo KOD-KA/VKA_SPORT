@@ -32,6 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.local.entity.BodyMetricEntity
+import com.vkasport.app.data.model.StrengthStandard
+import com.vkasport.app.data.model.StrengthStandards
 import com.vkasport.app.ui.common.SetFormat
 import com.vkasport.app.ui.common.SimpleLineChart
 import com.vkasport.app.ui.theme.Black
@@ -343,6 +345,43 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
 
         Spacer(Modifier.height(24.dp))
 
+        // ===== СРАВНЕНИЕ С НОРМАТИВАМИ =====
+        Text("СРАВНЕНИЕ", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Ориентиры силовых нормативов относительно веса тела (мужчины). " +
+                    "«Мастер» — уровень занимающихся 5+ лет, не официальное звание. " +
+                    "1ПМ оценивается по вашему лучшему подходу (формула Эпли).",
+            color = DarkGray, fontSize = 11.sp, lineHeight = 15.sp
+        )
+        Spacer(Modifier.height(10.dp))
+
+        if (currentWeight == null) {
+            Text(
+                "Введите свой вес (на старте тренировки или в журнале тела), " +
+                        "чтобы увидеть сравнение",
+                color = DarkGray, fontSize = 12.sp
+            )
+        } else {
+            var shownAny = false
+            StrengthStandards.standards.forEach { std ->
+                val rec = records[std.exerciseName] ?: return@forEach
+                if (rec.maxWeight <= 0f) return@forEach
+                shownAny = true
+                StandardCard(std, rec.maxWeight, rec.maxWeightReps, currentWeight)
+                Spacer(Modifier.height(10.dp))
+            }
+            if (!shownAny) {
+                Text(
+                    "Сделайте жим лёжа, присед, становую или жим стоя — " +
+                            "здесь появится сравнение с нормативами",
+                    color = DarkGray, fontSize = 12.sp
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
         // ===== ДАННЫЕ: БЭКАП / ВОССТАНОВЛЕНИЕ =====
         Text("ДАННЫЕ", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
@@ -534,6 +573,62 @@ private fun ActionButton(
             Text(title, color = Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(2.dp))
             Text(subtitle, color = DarkGray, fontSize = 11.sp, lineHeight = 15.sp)
+        }
+    }
+}
+
+// ===== КАРТОЧКА НОРМАТИВА =====
+@Composable
+private fun StandardCard(
+    std: StrengthStandard,
+    maxWeight: Float,
+    maxWeightReps: Int,
+    bodyWeight: Float
+) {
+    val orm = StrengthStandards.estimate1RM(maxWeight, maxWeightReps)
+    val ratio = orm / bodyWeight
+    val fraction = (ratio / std.master).coerceIn(0f, 1f)
+    val level = StrengthStandards.levelName(ratio, std)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SoftGray, RoundedCornerShape(16.dp))
+            .padding(14.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                std.exerciseName, color = Black, fontSize = 13.sp,
+                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
+            )
+            Text(level, color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Ваш 1ПМ ≈ ${SetFormat.num(orm)} кг (×${"%.2f".format(ratio)} веса тела)",
+            color = DarkGray, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        // Шкала: заполнение до уровня «Мастер (5+ лет)»
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(White, RoundedCornerShape(4.dp))
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(fraction)
+                    .height(8.dp)
+                    .background(Black, RoundedCornerShape(4.dp))
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("нов. ${SetFormat.num(std.beginner * bodyWeight)}", color = DarkGray, fontSize = 10.sp)
+            Text("люб. ${SetFormat.num(std.intermediate * bodyWeight)}", color = DarkGray, fontSize = 10.sp)
+            Text("прод. ${SetFormat.num(std.advanced * bodyWeight)}", color = DarkGray, fontSize = 10.sp)
+            Text("мастер ${SetFormat.num(std.master * bodyWeight)}", color = DarkGray, fontSize = 10.sp)
         }
     }
 }
