@@ -341,6 +341,9 @@ private fun WorkoutDetailSheet(
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
     val totalSets   = workout.exercises.sumOf { it.sets.size }
     val totalVolume = workout.exercises.sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }.toInt()
+    val kcal = com.vkasport.app.data.model.CalorieCalculator.estimateKcal(
+        workout.exercises, workout.durationMinutes, workout.athleteWeight
+    )
     val h = workout.durationMinutes / 60
     val m = workout.durationMinutes % 60
     val dur = when { h > 0 && m > 0 -> "$h ч $m мин"; h > 0 -> "$h ч"; else -> "$m мин" }
@@ -370,6 +373,8 @@ private fun WorkoutDetailSheet(
                 SummaryBlock("$totalVolume кг", "объём")
                 SummaryDivider()
                 SummaryBlock(dur, "время")
+                SummaryDivider()
+                SummaryBlock("~$kcal", "ккал")
             }
         }
 

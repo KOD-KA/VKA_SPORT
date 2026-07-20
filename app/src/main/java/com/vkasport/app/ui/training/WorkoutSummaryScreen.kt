@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vkasport.app.data.model.CalorieCalculator
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.White
@@ -28,6 +29,13 @@ fun WorkoutSummaryScreen(
     val exercisesCount = viewModel.getCurrentExercisesCount()
     val setsCount = viewModel.getCurrentSetsCount()
     val volume = viewModel.getCurrentVolume()
+
+    // Калории — по только что завершённой тренировке (она уже в архиве,
+    // completedWorkouts DESC → первый элемент)
+    val completedWorkouts by viewModel.completedWorkouts.collectAsState()
+    val kcal = completedWorkouts.firstOrNull()?.let {
+        CalorieCalculator.estimateKcal(it.exercises, it.durationMinutes, it.athleteWeight)
+    }
 
     var notes by remember { mutableStateOf("") }
 
@@ -83,6 +91,16 @@ fun WorkoutSummaryScreen(
                 StatBlock(
                     value = "${volume.toInt()}",
                     label = "кг объём"
+                )
+            }
+
+            kcal?.let {
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    text = "🔥 ~$it ккал",
+                    color = White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
