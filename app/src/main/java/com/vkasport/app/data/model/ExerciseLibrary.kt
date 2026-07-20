@@ -97,6 +97,53 @@ object ExerciseLibrary {
         ExerciseCatalog("Растяжка плеч",                    MuscleGroup.STRETCH, MeasureType.TIME),
         ExerciseCatalog("Растяжка трицепса",                MuscleGroup.STRETCH, MeasureType.TIME),
         ExerciseCatalog("Растяжка икроножных мышц",         MuscleGroup.STRETCH, MeasureType.TIME),
-        ExerciseCatalog("Растяжка бицепса",                 MuscleGroup.STRETCH, MeasureType.TIME)
+        ExerciseCatalog("Растяжка бицепса",                 MuscleGroup.STRETCH, MeasureType.TIME),
+
+        // ===== УЛИЦА (турники, брусья, воркаут) =====
+        // Повторяющиеся имена (Подтягивания, Отжимания и т.п.) СПЕЦИАЛЬНО
+        // совпадают с залом — история и рекорды у упражнения общие,
+        // независимо от того, где оно сделано. Тип у одноимённых упражнений
+        // обязан совпадать!
+        ExerciseCatalog("Подтягивания",                     MuscleGroup.STREET),
+        ExerciseCatalog("Отжимания",                        MuscleGroup.STREET),
+        ExerciseCatalog("Отжимания на брусьях",             MuscleGroup.STREET),
+        ExerciseCatalog("Австралийские подтягивания",       MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Выход силы",                       MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Подъем ног в висе",                MuscleGroup.STREET),
+        ExerciseCatalog("Уголок на турнике",                MuscleGroup.STREET, MeasureType.TIME),
+        ExerciseCatalog("Пистолетик (присед на одной ноге)", MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Запрыгивания на возвышение",       MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Берпи",                            MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Бег на улице",                     MuscleGroup.STREET, MeasureType.DISTANCE),
+        ExerciseCatalog("Скакалка",                         MuscleGroup.STREET, MeasureType.TIME),
+
+        // ===== ДОМ (без оборудования) =====
+        ExerciseCatalog("Отжимания",                        MuscleGroup.HOME),
+        ExerciseCatalog("Приседания без веса",              MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Выпады на месте",                  MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Планка",                           MuscleGroup.HOME, MeasureType.TIME),
+        ExerciseCatalog("Боковая планка",                   MuscleGroup.HOME, MeasureType.TIME),
+        ExerciseCatalog("Стульчик у стены",                 MuscleGroup.HOME, MeasureType.TIME),
+        ExerciseCatalog("Ягодичный мостик",                 MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Обратные отжимания от стула",      MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Скалолаз",                         MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Подъемы корпуса",                  MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Супермен",                         MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Берпи",                            MuscleGroup.HOME, MeasureType.REPS),
+
+        // ===== ЖИРОСЖИГАНИЕ (кардио) =====
+        // CARDIO = нагрузка тренажёра / скорость / время
+        // DISTANCE = дистанция + время (улица)
+        ExerciseCatalog("Беговая дорожка",                  MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Бег на улице",                     MuscleGroup.FAT_BURN, MeasureType.DISTANCE),
+        ExerciseCatalog("Велотренажёр",                     MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Велопрогулка",                     MuscleGroup.FAT_BURN, MeasureType.DISTANCE),
+        ExerciseCatalog("Эллипсоид",                        MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Гребной тренажёр",                 MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Степпер",                          MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Ходьба в горку",                   MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Скакалка",                         MuscleGroup.FAT_BURN, MeasureType.TIME),
+        ExerciseCatalog("Лыжи",                             MuscleGroup.FAT_BURN, MeasureType.DISTANCE),
+        ExerciseCatalog("Плавание",                         MuscleGroup.FAT_BURN, MeasureType.DISTANCE)
     )
 }
