@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.model.ExerciseLibrary
+import com.vkasport.app.data.model.MeasureType
 import com.vkasport.app.data.model.MuscleGroup
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
@@ -31,12 +32,17 @@ fun ExerciseSelectionScreen(
     lastGroupExercises: List<String> = emptyList(),
     onBack: () -> Unit,
     onRepeatLastGroup: () -> Unit,
-    onAddCustomExercise: (String) -> Unit,
+    onAddCustomExercise: (String, MeasureType) -> Unit,
     onExerciseSelected: (String) -> Unit
 ) {
     val libraryExercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
     var addingCustom by remember(muscleGroup) { mutableStateOf(false) }
     var customText by remember(muscleGroup) { mutableStateOf("") }
+    // «Как считать» — для растяжки по умолчанию время, иначе вес×повторы
+    var customType by remember(muscleGroup) {
+        mutableStateOf(if (muscleGroup == MuscleGroup.STRETCH) MeasureType.TIME else MeasureType.WEIGHT_REPS)
+    }
+    var typeMenuOpen by remember(muscleGroup) { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -168,7 +174,7 @@ fun ExerciseSelectionScreen(
                                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                                     onDone = {
                                         if (customText.isNotBlank()) {
-                                            onAddCustomExercise(customText.trim())
+                                            onAddCustomExercise(customText.trim(), customType)
                                             customText = ""
                                             addingCustom = false
                                         }
@@ -187,7 +193,7 @@ fun ExerciseSelectionScreen(
                                         RoundedCornerShape(12.dp)
                                     )
                                     .clickable(enabled = customText.isNotBlank()) {
-                                        onAddCustomExercise(customText.trim())
+                                        onAddCustomExercise(customText.trim(), customType)
                                         customText = ""
                                         addingCustom = false
                                     },
@@ -196,7 +202,50 @@ fun ExerciseSelectionScreen(
                                 Text("✓", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                        Spacer(Modifier.height(10.dp))
+
+                        // ── КАК СЧИТАТЬ (выпадающее меню) ────────────
+                        Text("Как считать", fontSize = 12.sp, color = DarkGray, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(6.dp))
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(White, RoundedCornerShape(10.dp))
+                                    .clickable { typeMenuOpen = true }
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(customType.title, color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text(customType.shortHint, color = DarkGray, fontSize = 11.sp)
+                                }
+                                Text("▾", color = DarkGray, fontSize = 14.sp)
+                            }
+                            DropdownMenu(
+                                expanded = typeMenuOpen,
+                                onDismissRequest = { typeMenuOpen = false },
+                                containerColor = White
+                            ) {
+                                MeasureType.entries.forEach { type ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(type.title, color = Black, fontSize = 14.sp,
+                                                    fontWeight = if (type == customType) FontWeight.Bold else FontWeight.Normal)
+                                                Text(type.shortHint, color = DarkGray, fontSize = 11.sp)
+                                            }
+                                        },
+                                        onClick = {
+                                            customType = type
+                                            typeMenuOpen = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
                         Text(
                             "Отмена", fontSize = 12.sp, color = DarkGray,
                             modifier = Modifier.clickable { addingCustom = false; customText = "" }

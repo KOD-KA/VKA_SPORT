@@ -169,9 +169,11 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                         viewModel.addExercise(ex)
                         viewModel.setCurrentScreen("training")
                     },
-                    onAddCustomExercise = { name ->
-                        viewModel.addCustomExercise(name, g)
-                        viewModel.addExercise(name)
+                    onAddCustomExercise = { name, measureType ->
+                        viewModel.addCustomExercise(name, g, measureType)
+                        // Передаём тип явно: своё упражнение могло ещё не
+                        // успеть загрузиться из БД к моменту добавления
+                        viewModel.addExercise(name, measureType)
                         viewModel.setCurrentScreen("training")
                     }
                 )

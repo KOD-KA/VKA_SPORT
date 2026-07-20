@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.model.ExerciseHistory
 import com.vkasport.app.data.model.ExerciseLibrary
+import com.vkasport.app.data.model.MeasureType
+import com.vkasport.app.ui.common.SetFormat
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
@@ -133,39 +135,68 @@ private fun RecordCard(record: ExerciseHistory, isPrimary: Boolean) {
         // Тело
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
 
-            // ─ МАКС. ВЕС ────────────────────────────────────────────
-            MetricRow(
-                icon        = "🏆",
-                label       = "макс. вес",
-                bigValue    = "${record.maxWeight.toInt()}",
-                subValue    = "× ${record.maxWeightReps}",
-                date        = record.recordDate?.format(dateFmt),
-                subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
-            )
+            // МОДЕЛЬ V2: содержимое карточки зависит от типа упражнения
+            when (record.measureType) {
+                MeasureType.REPS -> MetricRow(
+                    icon     = "🏆",
+                    label    = "макс. повторы",
+                    bigValue = "${record.maxReps}",
+                    subValue = "повт.",
+                    date     = record.recordDate?.format(dateFmt),
+                    subDate  = record.athleteWeight?.let { "%.1f кг".format(it) }
+                )
+                MeasureType.TIME -> MetricRow(
+                    icon     = "🏆",
+                    label    = "лучшее время",
+                    bigValue = SetFormat.time(record.bestSeconds ?: 0),
+                    subValue = "мин:сек",
+                    date     = record.recordDate?.format(dateFmt),
+                    subDate  = record.athleteWeight?.let { "%.1f кг".format(it) }
+                )
+                MeasureType.DISTANCE -> MetricRow(
+                    icon     = "🏆",
+                    label    = "макс. дистанция",
+                    bigValue = SetFormat.num(record.bestDistanceKm ?: 0f),
+                    subValue = "км",
+                    date     = record.recordDate?.format(dateFmt),
+                    subDate  = record.athleteWeight?.let { "%.1f кг".format(it) }
+                )
+                else -> {
+                    // ─ МАКС. ВЕС ────────────────────────────────────
+                    MetricRow(
+                        icon        = "🏆",
+                        label       = "макс. вес",
+                        bigValue    = "${record.maxWeight.toInt()}",
+                        subValue    = "× ${record.maxWeightReps}",
+                        date        = record.recordDate?.format(dateFmt),
+                        subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
+                    )
 
-            // Толстый разделитель
-            Spacer(Modifier.height(10.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.5.dp)
-                    .background(DarkGray.copy(alpha = 0.22f))
-            )
-            Spacer(Modifier.height(10.dp))
+                    // Толстый разделитель
+                    Spacer(Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.5.dp)
+                            .background(DarkGray.copy(alpha = 0.22f))
+                    )
+                    Spacer(Modifier.height(10.dp))
 
-            // ─ МАКС. ОБЪЁМ ──────────────────────────────────────────
-            val volSubValue = if (record.bestVolumeWeight != null && record.bestVolumeReps != null)
-                "${fmtW(record.bestVolumeWeight)} × ${record.bestVolumeReps}"
-            else "кг"
+                    // ─ МАКС. ОБЪЁМ ──────────────────────────────────
+                    val volSubValue = if (record.bestVolumeWeight != null && record.bestVolumeReps != null)
+                        "${fmtW(record.bestVolumeWeight)} × ${record.bestVolumeReps}"
+                    else "кг"
 
-            MetricRow(
-                icon        = "📊",
-                label       = "макс. объём",
-                bigValue    = "${record.bestVolume.toInt()}",
-                subValue    = volSubValue,
-                date        = record.recordDate?.format(dateFmt),
-                subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
-            )
+                    MetricRow(
+                        icon        = "📊",
+                        label       = "макс. объём",
+                        bigValue    = "${record.bestVolume.toInt()}",
+                        subValue    = volSubValue,
+                        date        = record.recordDate?.format(dateFmt),
+                        subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
+                    )
+                }
+            }
         }
     }
 }
