@@ -6,16 +6,20 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -23,9 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vkasport.app.data.local.entity.BodyMetricEntity
+import com.vkasport.app.ui.common.SetFormat
+import com.vkasport.app.ui.common.SimpleLineChart
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
 import com.vkasport.app.ui.theme.SoftGray
@@ -37,16 +45,20 @@ import java.time.temporal.ChronoUnit
 /**
  * Вкладка «Профиль» (страница 4 Pager).
  *
- * Сейчас: сводная статистика + бэкап/восстановление + «О приложении».
- * Следующие этапы добавят: тело и замеры с графиками, прогресс,
- * сравнение с нормативами, пожертвования.
+ * Разделы: сводная статистика, ТЕЛО (вес и замеры с графиками),
+ * ДАННЫЕ (бэкап/восстановление), О приложении.
+ * Дальше добавятся: прогресс, сравнение с нормативами, пожертвования.
  */
 @Composable
 fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel) {
 
     val workouts by viewModel.completedWorkouts.collectAsState()
     val records by viewModel.exerciseHistory.collectAsState()
+    val bodyMetrics by viewModel.bodyMetrics.collectAsState()
     val context = LocalContext.current
+    val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yy") }
+
+    LaunchedEffect(Unit) { viewModel.loadBodyMetrics() }
 
     // workouts отсортирован DESC (новые первые) → самая ПЕРВАЯ тренировка
     // в жизни — это ПОСЛЕДНИЙ элемент списка. Здесь lastOrNull() корректен.
@@ -58,9 +70,11 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     val totalVolumeKg = workouts.sumOf { w ->
         w.exercises.sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }
     }
-    val currentWeight = workouts.firstOrNull()?.athleteWeight
 
-    // ===== ЛАУНЧЕРЫ БЭКАПА (SAF: системный выбор файла, разрешения не нужны) =====
+    val weightHistory = remember(workouts, bodyMetrics) { viewModel.getWeightHistory() }
+    val currentWeight = weightHistory.lastOrNull()?.second
+
+    // ===== ЛАУНЧЕРЫ БЭКАПА (SAF) =====
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -70,25 +84,19 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             }
         }
     }
-
-    // Uri выбранного файла, ждущий подтверждения восстановления
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
-
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let { pendingImportUri = it }
-    }
+    ) { uri: Uri? -> uri?.let { pendingImportUri = it } }
 
-    // Диалог подтверждения восстановления
     pendingImportUri?.let { uri ->
         AlertDialog(
             onDismissRequest = { pendingImportUri = null },
             title = { Text("Восстановить из бэкапа?") },
             text = {
                 Text(
-                    "Все текущие данные (архив, рекорды, план, свои упражнения) " +
-                            "будут ЗАМЕНЕНЫ данными из файла. Отменить это будет нельзя."
+                    "Все текущие данные (архив, рекорды, план, свои упражнения, " +
+                            "журнал тела) будут ЗАМЕНЕНЫ данными из файла. Отменить это будет нельзя."
                 )
             },
             confirmButton = {
@@ -101,6 +109,19 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             },
             dismissButton = {
                 TextButton(onClick = { pendingImportUri = null }) { Text("Отмена") }
+            }
+        )
+    }
+
+    // ===== ДИАЛОГ ДОБАВЛЕНИЯ ЗАМЕРОВ =====
+    var showMeasureDialog by remember { mutableStateOf(false) }
+    if (showMeasureDialog) {
+        MeasureDialog(
+            onDismiss = { showMeasureDialog = false },
+            onSave = { entity ->
+                viewModel.addBodyMetric(entity)
+                showMeasureDialog = false
+                Toast.makeText(context, "Замеры записаны", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -147,36 +168,19 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
 
         // ===== СВОДНАЯ СТАТИСТИКА (2×2) =====
         Row(Modifier.fillMaxWidth()) {
-            StatCard(
-                value = workouts.size.toString(),
-                label = "тренировок всего",
-                modifier = Modifier.weight(1f)
-            )
+            StatCard(workouts.size.toString(), "тренировок всего", Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
-            StatCard(
-                value = last30.toString(),
-                label = "за 30 дней",
-                modifier = Modifier.weight(1f)
-            )
+            StatCard(last30.toString(), "за 30 дней", Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth()) {
-            StatCard(
-                value = records.size.toString(),
-                label = "рекордов",
-                modifier = Modifier.weight(1f)
-            )
+            StatCard(records.size.toString(), "рекордов", Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
-            StatCard(
-                value = daysSinceStart?.let { "$it" } ?: "—",
-                label = "дней с первой тренировки",
-                modifier = Modifier.weight(1f)
-            )
+            StatCard(daysSinceStart?.let { "$it" } ?: "—", "дней с первой тренировки", Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(12.dp))
 
-        // Общий поднятый объём — на всю ширину
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -194,11 +198,146 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    "общий поднятый объём",
-                    color = White.copy(alpha = 0.65f),
-                    fontSize = 12.sp
-                )
+                Text("общий поднятый объём", color = White.copy(alpha = 0.65f), fontSize = 12.sp)
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // ===== ТЕЛО: ВЕС И ЗАМЕРЫ =====
+        Text("ТЕЛО", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
+
+        // График веса
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SoftGray, RoundedCornerShape(16.dp))
+                .padding(14.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("ВЕС, КГ", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                currentWeight?.let {
+                    Text("%.1f".format(it), color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            SimpleLineChart(
+                values = weightHistory.map { it.second },
+                startLabel = weightHistory.firstOrNull()?.first?.format(dateFmt),
+                endLabel = weightHistory.lastOrNull()?.first?.format(dateFmt)
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // График выбранного замера
+        val metricOptions: List<Pair<String, (BodyMetricEntity) -> Float?>> = remember {
+            listOf(
+                "Грудь" to { m: BodyMetricEntity -> m.chest },
+                "Талия" to { m: BodyMetricEntity -> m.waist },
+                "Бёдра" to { m: BodyMetricEntity -> m.hips },
+                "Бицепс" to { m: BodyMetricEntity -> m.biceps },
+                "Предплечье" to { m: BodyMetricEntity -> m.forearm },
+                "Бедро" to { m: BodyMetricEntity -> m.thigh },
+                "Икра" to { m: BodyMetricEntity -> m.calf },
+                "Шея" to { m: BodyMetricEntity -> m.neck },
+                "Плечи" to { m: BodyMetricEntity -> m.shoulders }
+            )
+        }
+        var selectedMetric by remember { mutableStateOf(0) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(SoftGray, RoundedCornerShape(16.dp))
+                .padding(14.dp)
+        ) {
+            Text("ЗАМЕРЫ, СМ", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+
+            // Выбор метрики (горизонтальная прокрутка)
+            Row(Modifier.horizontalScroll(rememberScrollState())) {
+                metricOptions.forEachIndexed { index, (label, _) ->
+                    val selected = index == selectedMetric
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .background(
+                                if (selected) Black else White,
+                                RoundedCornerShape(20.dp)
+                            )
+                            .clickable { selectedMetric = index }
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            label,
+                            color = if (selected) White else Black,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+
+            val selector = metricOptions[selectedMetric].second
+            val metricPoints = bodyMetrics.mapNotNull { m ->
+                selector(m)?.let { LocalDate.ofEpochDay(m.date) to it }
+            }
+            SimpleLineChart(
+                values = metricPoints.map { it.second },
+                startLabel = metricPoints.firstOrNull()?.first?.format(dateFmt),
+                endLabel = metricPoints.lastOrNull()?.first?.format(dateFmt)
+            )
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // Кнопка добавления замеров
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Black, RoundedCornerShape(14.dp))
+                .clickable { showMeasureDialog = true }
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("+ ЗАПИСАТЬ ЗАМЕРЫ", color = White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+
+        // Последние записи журнала (новые сверху)
+        if (bodyMetrics.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            bodyMetrics.takeLast(5).reversed().forEach { m ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp)
+                        .background(SoftGray, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        LocalDate.ofEpochDay(m.date).format(dateFmt),
+                        color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    val summary = listOfNotNull(
+                        m.weight?.let { "вес ${SetFormat.num(it)}" },
+                        m.chest?.let { "грудь ${SetFormat.num(it)}" },
+                        m.waist?.let { "талия ${SetFormat.num(it)}" },
+                        m.biceps?.let { "бицепс ${SetFormat.num(it)}" }
+                    ).joinToString(" · ").ifEmpty { "запись" }
+                    Text(summary, color = DarkGray, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text(
+                        "✕", color = DarkGray, fontSize = 13.sp,
+                        modifier = Modifier
+                            .clickable { viewModel.deleteBodyMetric(m.id) }
+                            .padding(4.dp)
+                    )
+                }
             }
         }
 
@@ -211,7 +350,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
         ActionButton(
             emoji = "💾",
             title = "Сохранить бэкап",
-            subtitle = "Все данные в один файл — архив, рекорды, план, свои упражнения"
+            subtitle = "Все данные в один файл — архив, рекорды, план, свои упражнения, журнал тела"
         ) {
             val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
             exportLauncher.launch("vka_sport_backup_$today.json")
@@ -225,13 +364,10 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             importLauncher.launch(arrayOf("*/*"))
         }
 
-        // Здесь появятся разделы следующих этапов:
-        // тело и замеры, прогресс, сравнение, пожертвования
-
         Spacer(Modifier.weight(1f, fill = true))
         Spacer(Modifier.height(28.dp))
 
-        // ===== О ПРИЛОЖЕНИИ (внизу профиля) =====
+        // ===== О ПРИЛОЖЕНИИ =====
         val versionName = remember {
             try {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName
@@ -250,7 +386,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             Spacer(Modifier.height(8.dp))
             Text(
                 "VKA SPORT — дневник тренировок: подходы, рекорды, архив, " +
-                        "календарь с напоминаниями и таймер отдыха.",
+                        "календарь с напоминаниями, таймер отдыха и журнал тела.",
                 color = DarkGray,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -271,6 +407,98 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     }
 }
 
+// ===== ДИАЛОГ ЗАМЕРОВ =====
+@Composable
+private fun MeasureDialog(
+    onDismiss: () -> Unit,
+    onSave: (BodyMetricEntity) -> Unit
+) {
+    var weightIn by remember { mutableStateOf("") }
+    var chestIn by remember { mutableStateOf("") }
+    var waistIn by remember { mutableStateOf("") }
+    var hipsIn by remember { mutableStateOf("") }
+    var bicepsIn by remember { mutableStateOf("") }
+    var forearmIn by remember { mutableStateOf("") }
+    var thighIn by remember { mutableStateOf("") }
+    var calfIn by remember { mutableStateOf("") }
+    var neckIn by remember { mutableStateOf("") }
+    var shouldersIn by remember { mutableStateOf("") }
+
+    fun parse(s: String): Float? = s.replace(",", ".").toFloatOrNull()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Замеры на сегодня") },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    "Заполните только то, что измерили — остальное можно оставить пустым.",
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                MeasureField("Вес, кг", weightIn) { weightIn = it }
+                MeasureField("Грудь, см", chestIn) { chestIn = it }
+                MeasureField("Талия, см", waistIn) { waistIn = it }
+                MeasureField("Бёдра (таз), см", hipsIn) { hipsIn = it }
+                MeasureField("Бицепс, см", bicepsIn) { bicepsIn = it }
+                MeasureField("Предплечье, см", forearmIn) { forearmIn = it }
+                MeasureField("Бедро, см", thighIn) { thighIn = it }
+                MeasureField("Икра, см", calfIn) { calfIn = it }
+                MeasureField("Шея, см", neckIn) { neckIn = it }
+                MeasureField("Плечи, см", shouldersIn) { shouldersIn = it }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val entity = BodyMetricEntity(
+                    date = LocalDate.now().toEpochDay(),
+                    weight = parse(weightIn),
+                    chest = parse(chestIn),
+                    waist = parse(waistIn),
+                    hips = parse(hipsIn),
+                    biceps = parse(bicepsIn),
+                    forearm = parse(forearmIn),
+                    thigh = parse(thighIn),
+                    calf = parse(calfIn),
+                    neck = parse(neckIn),
+                    shoulders = parse(shouldersIn)
+                )
+                val hasAnything = listOf(
+                    entity.weight, entity.chest, entity.waist, entity.hips,
+                    entity.biceps, entity.forearm, entity.thigh, entity.calf,
+                    entity.neck, entity.shoulders
+                ).any { it != null }
+                if (hasAnything) onSave(entity)
+            }) { Text("СОХРАНИТЬ") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    )
+}
+
+@Composable
+private fun MeasureField(label: String, value: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label, fontSize = 12.sp) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Black, cursorColor = Black,
+            focusedTextColor = Black, unfocusedTextColor = Black
+        )
+    )
+}
+
 @Composable
 private fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
     Column(
@@ -281,12 +509,7 @@ private fun StatCard(value: String, label: String, modifier: Modifier = Modifier
     ) {
         Text(value, color = Black, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
-        Text(
-            label,
-            color = DarkGray,
-            fontSize = 11.sp,
-            textAlign = TextAlign.Center
-        )
+        Text(label, color = DarkGray, fontSize = 11.sp, textAlign = TextAlign.Center)
     }
 }
 

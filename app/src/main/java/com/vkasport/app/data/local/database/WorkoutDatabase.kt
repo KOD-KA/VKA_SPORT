@@ -28,13 +28,15 @@ import com.vkasport.app.data.local.entity.*
         PlannedWorkoutEntity::class,
         PlannedExerciseEntity::class,
         CustomExerciseEntity::class,
-        InProgressWorkoutEntity::class
+        InProgressWorkoutEntity::class,
+        BodyMetricEntity::class
     ],
     // 14 -> 15: модель упражнений v2 — типы измерений (MeasureType):
     //   custom_exercises.measureType, completed_workout_exercises.measureType,
     //   completed_workout_sets.{seconds,distanceKm,load,speed},
     //   exercise_history.{measureType,bestSeconds,bestDistanceKm}
-    version = 15,
+    // 15 -> 16: таблица body_metrics (вес и замеры тела, этап «тело»)
+    version = 16,
     exportSchema = true
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -48,4 +50,5 @@ abstract class WorkoutDatabase : RoomDatabase() {
     abstract fun plannedWorkoutDao(): PlannedWorkoutDao
     abstract fun customExerciseDao(): CustomExerciseDao
     abstract fun inProgressWorkoutDao(): InProgressWorkoutDao
+    abstract fun bodyMetricDao(): BodyMetricDao
 }

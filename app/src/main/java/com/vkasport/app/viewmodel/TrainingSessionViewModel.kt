@@ -38,6 +38,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // заново при следующем подходе, это осознанный компромисс.
     private val _restTimerStart = MutableStateFlow<Long?>(null)
 
+    // ЖУРНАЛ ТЕЛА (этап «тело»): записи веса и замеров, отсортированы по
+    // дате ПО ВОЗРАСТАНИЮ (старые первые — так удобнее строить графики)
+    private val _bodyMetrics = MutableStateFlow<List<BodyMetricEntity>>(emptyList())
+
     val state: StateFlow<CurrentWorkoutState>     = _state
     val completedWorkouts = _completedWorkouts.asStateFlow()
     val exerciseHistory   = _exerciseHistory.asStateFlow()
@@ -45,6 +49,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     val customExercises   = _customExercises.asStateFlow()
     val lastCompletedWorkoutId = _lastCompletedWorkoutId.asStateFlow()
     val restTimerStart = _restTimerStart.asStateFlow()
+    val bodyMetrics = _bodyMetrics.asStateFlow()
 
     // ВАЖНЫЙ ИНВАРИАНТ: _completedWorkouts ВСЕГДА отсортирован по dateTime
     // по убыванию — [0] самая свежая тренировка, последняя — самая старая.
@@ -588,6 +593,44 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     fun getCurrentSetsCount()      = _state.value.selectedExercises.sumOf { it.sets.size }
     fun getCurrentVolume()         = _state.value.selectedExercises.sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }.toFloat()
 
+    // ==================== ЖУРНАЛ ТЕЛА ====================
+
+    fun loadBodyMetrics() {
+        viewModelScope.launch { _bodyMetrics.value = database.bodyMetricDao().getAll() }
+    }
+
+    fun addBodyMetric(entity: BodyMetricEntity) {
+        viewModelScope.launch {
+            database.bodyMetricDao().insert(entity)
+            loadBodyMetrics()
+        }
+    }
+
+    fun deleteBodyMetric(id: Long) {
+        viewModelScope.launch {
+            database.bodyMetricDao().deleteById(id)
+            loadBodyMetrics()
+        }
+    }
+
+    /**
+     * История веса для графика: объединяет вес атлета из тренировок
+     * (вводится на старте каждой тренировки) и ручные записи журнала тела.
+     * Несколько значений за один день усредняются. Отсортировано по дате.
+     */
+    fun getWeightHistory(): List<Pair<LocalDate, Float>> {
+        val fromWorkouts = _completedWorkouts.value.mapNotNull { w ->
+            w.athleteWeight?.let { w.dateTime.toLocalDate() to it }
+        }
+        val fromMetrics = _bodyMetrics.value.mapNotNull { m ->
+            m.weight?.let { LocalDate.ofEpochDay(m.date) to it }
+        }
+        return (fromWorkouts + fromMetrics)
+            .groupBy { it.first }
+            .map { (d, list) -> d to (list.map { it.second }.average().toFloat()) }
+            .sortedBy { it.first }
+    }
+
     // ==================== БЭКАП / ВОССТАНОВЛЕНИЕ ====================
 
     /** Сохраняет все данные в файл, выбранный пользователем (SAF-uri). */
@@ -627,6 +670,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 loadRecordsFromDatabase()
                 loadCustomExercises()
                 loadPlannedWorkouts()
+                loadBodyMetrics()
 
                 onResult(true, "Данные восстановлены")
             } catch (e: IllegalArgumentException) {

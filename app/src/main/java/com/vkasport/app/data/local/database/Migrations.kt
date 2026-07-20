@@ -41,7 +41,33 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+/**
+ * 15 -> 16: новая таблица body_metrics — вес и замеры тела (этап «тело»).
+ * SQL должен В ТОЧНОСТИ совпадать со схемой, которую Room генерирует для
+ * BodyMetricEntity (сверено с app/schemas/16.json после сборки).
+ */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `body_metrics` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`date` INTEGER NOT NULL, " +
+                    "`weight` REAL, " +
+                    "`chest` REAL, " +
+                    "`waist` REAL, " +
+                    "`hips` REAL, " +
+                    "`biceps` REAL, " +
+                    "`forearm` REAL, " +
+                    "`thigh` REAL, " +
+                    "`calf` REAL, " +
+                    "`neck` REAL, " +
+                    "`shoulders` REAL)"
+        )
+    }
+}
+
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
-    MIGRATION_14_15
-    // сюда добавлять будущие миграции: MIGRATION_15_16, ...
+    MIGRATION_14_15,
+    MIGRATION_15_16
+    // сюда добавлять будущие миграции: MIGRATION_16_17, ...
 )

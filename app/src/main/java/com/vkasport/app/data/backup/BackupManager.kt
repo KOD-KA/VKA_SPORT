@@ -8,6 +8,7 @@ import com.vkasport.app.data.local.entity.CustomExerciseEntity
 import com.vkasport.app.data.local.entity.ExerciseHistoryEntity
 import com.vkasport.app.data.local.entity.PlannedExerciseEntity
 import com.vkasport.app.data.local.entity.PlannedWorkoutEntity
+import com.vkasport.app.data.local.entity.BodyMetricEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -18,6 +19,7 @@ import org.json.JSONObject
  *
  * ПРАВИЛА ВЕРСИОНИРОВАНИЯ ФОРМАТА:
  *  - formatVersion 1: исходный формат (вес × повторы)
+ *  - formatVersion 3: + журнал тела (bodyMetrics)
  *  - formatVersion 2: + measureType у упражнений/своих упражнений,
  *    + seconds/distanceKm/load/speed у подходов,
  *    + measureType/bestSeconds/bestDistanceKm у рекордов
@@ -27,7 +29,7 @@ import org.json.JSONObject
  */
 object BackupManager {
 
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
 
     // ==================== ЭКСПОРТ (всегда в новейшем формате) ====================
 
@@ -121,6 +123,25 @@ object BackupManager {
         }
         root.put("customExercises", customArr)
 
+        // --- журнал тела ---
+        val bodyArr = JSONArray()
+        db.bodyMetricDao().getAll().forEach { m ->
+            val mObj = JSONObject()
+            mObj.put("date", m.date)
+            m.weight?.let { mObj.put("weight", it.toDouble()) }
+            m.chest?.let { mObj.put("chest", it.toDouble()) }
+            m.waist?.let { mObj.put("waist", it.toDouble()) }
+            m.hips?.let { mObj.put("hips", it.toDouble()) }
+            m.biceps?.let { mObj.put("biceps", it.toDouble()) }
+            m.forearm?.let { mObj.put("forearm", it.toDouble()) }
+            m.thigh?.let { mObj.put("thigh", it.toDouble()) }
+            m.calf?.let { mObj.put("calf", it.toDouble()) }
+            m.neck?.let { mObj.put("neck", it.toDouble()) }
+            m.shoulders?.let { mObj.put("shoulders", it.toDouble()) }
+            bodyArr.put(mObj)
+        }
+        root.put("bodyMetrics", bodyArr)
+
         root.toString(2)
     }
 
@@ -140,6 +161,7 @@ object BackupManager {
         when (val v = root.optInt("formatVersion", -1)) {
             1 -> importV1(db, root)
             2 -> importV2(db, root)
+            3 -> importV3(db, root)
             else -> throw IllegalArgumentException(
                 "Бэкап формата версии $v — эта версия приложения его не знает. Обновите приложение."
             )
@@ -147,8 +169,37 @@ object BackupManager {
     }
 
     /**
-     * Парсер формата v2 (текущий). Общий код с importV1 намеренно НЕ
-     * выносится: парсеры старых версий должны оставаться замороженными.
+     * Парсер формата v3 (текущий): всё из v2 + журнал тела.
+     * v2-часть переиспользуется напрямую — она читает только известные ей
+     * поля, а bodyMetrics докидываем отдельно (clearAllTables уже внутри).
+     */
+    private suspend fun importV3(db: WorkoutDatabase, root: JSONObject) {
+        importV2(db, root)
+
+        val bodyArr = root.optJSONArray("bodyMetrics") ?: JSONArray()
+        for (i in 0 until bodyArr.length()) {
+            val mObj = bodyArr.getJSONObject(i)
+            db.bodyMetricDao().insert(
+                BodyMetricEntity(
+                    date = mObj.getLong("date"),
+                    weight = if (mObj.has("weight")) mObj.getDouble("weight").toFloat() else null,
+                    chest = if (mObj.has("chest")) mObj.getDouble("chest").toFloat() else null,
+                    waist = if (mObj.has("waist")) mObj.getDouble("waist").toFloat() else null,
+                    hips = if (mObj.has("hips")) mObj.getDouble("hips").toFloat() else null,
+                    biceps = if (mObj.has("biceps")) mObj.getDouble("biceps").toFloat() else null,
+                    forearm = if (mObj.has("forearm")) mObj.getDouble("forearm").toFloat() else null,
+                    thigh = if (mObj.has("thigh")) mObj.getDouble("thigh").toFloat() else null,
+                    calf = if (mObj.has("calf")) mObj.getDouble("calf").toFloat() else null,
+                    neck = if (mObj.has("neck")) mObj.getDouble("neck").toFloat() else null,
+                    shoulders = if (mObj.has("shoulders")) mObj.getDouble("shoulders").toFloat() else null
+                )
+            )
+        }
+    }
+
+    /**
+     * Парсер формата v2. ЗАМОРОЖЕН — не редактировать (используется и как
+     * основа importV3: читает только свои поля).
      */
     private suspend fun importV2(db: WorkoutDatabase, root: JSONObject) {
         db.clearAllTables()
