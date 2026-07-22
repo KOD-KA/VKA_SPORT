@@ -36,7 +36,7 @@ fun StartWorkoutScreen(
 
         // ===== ЛОГОТИП =====
         Text(
-            text = "VKA SPORT",
+            text = "STYRK",
             color = White,
             fontSize = 36.sp,
             fontWeight = FontWeight.Bold

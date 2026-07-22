@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -252,6 +253,74 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
             } else ex
         }
         setState(_state.value.copy(selectedExercises = updated))
+        // БАГ 4: после редактирования пересчитываем рекорд с нуля — иначе он
+        // "застревал" на старом значении (инкрементальный апдейт при add
+        // только повышал рекорд, редактирование его не трогало)
+        _state.value.selectedExercises.find { it.id == exerciseId }
+            ?.let { recomputeExerciseStats(it.name) }
+    }
+
+    /**
+     * БАГ 4: полный пересчёт рекордов упражнения из ВСЕХ подходов —
+     * прошлых (архив) и текущей сессии. В отличие от updateStatsForSet,
+     * умеет и понижать рекорд (если рекордный подход отредактировали вниз).
+     */
+    private fun recomputeExerciseStats(name: String) {
+        data class Src(val set: WorkoutSet, val date: LocalDateTime?, val bodyWeight: Float?, val mt: MeasureType)
+        val srcs = ArrayList<Src>()
+        _completedWorkouts.value.forEach { w ->
+            w.exercises.filter { it.name == name }.forEach { ex ->
+                ex.sets.forEach { s -> srcs.add(Src(s, w.dateTime, w.athleteWeight, ex.measureType)) }
+            }
+        }
+        _state.value.selectedExercises.filter { it.name == name }.forEach { ex ->
+            ex.sets.forEach { s -> srcs.add(Src(s, LocalDateTime.now(), _state.value.athleteWeight, ex.measureType)) }
+        }
+        if (srcs.isEmpty()) return
+        val mt = srcs.first().mt
+        val base = ExerciseHistory(exerciseName = name, measureType = mt)
+        val updated: ExerciseHistory = when (mt) {
+            MeasureType.WEIGHT_REPS -> {
+                val maxW = srcs.maxByOrNull { it.set.weight }!!
+                val maxV = srcs.maxByOrNull { it.set.weight * it.set.reps }!!
+                base.copy(
+                    maxWeight = maxW.set.weight,
+                    maxWeightReps = maxW.set.reps,
+                    maxReps = srcs.maxOf { it.set.reps },
+                    bestVolume = maxV.set.weight * maxV.set.reps,
+                    bestVolumeWeight = maxV.set.weight,
+                    bestVolumeReps = maxV.set.reps,
+                    recordDate = maxW.date,
+                    athleteWeight = maxW.bodyWeight
+                )
+            }
+            MeasureType.REPS -> {
+                val m = srcs.maxByOrNull { it.set.reps }!!
+                base.copy(maxReps = m.set.reps, recordDate = m.date, athleteWeight = m.bodyWeight)
+            }
+            MeasureType.TIME -> {
+                val m = srcs.maxByOrNull { it.set.seconds ?: 0 }!!
+                base.copy(bestSeconds = m.set.seconds, recordDate = m.date, athleteWeight = m.bodyWeight)
+            }
+            MeasureType.DISTANCE -> {
+                val m = srcs.maxByOrNull { it.set.distanceKm ?: 0f }!!
+                base.copy(bestDistanceKm = m.set.distanceKm, recordDate = m.date, athleteWeight = m.bodyWeight)
+            }
+            MeasureType.CARDIO -> return
+        }
+        _exerciseHistory.value = _exerciseHistory.value + (name to updated)
+        viewModelScope.launch {
+            database.exerciseHistoryDao().save(ExerciseHistoryEntity(
+                exerciseName = updated.exerciseName, maxWeight = updated.maxWeight,
+                maxWeightReps = updated.maxWeightReps, maxReps = updated.maxReps,
+                bestVolume = updated.bestVolume,
+                recordDate = updated.recordDate?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
+                athleteWeight = updated.athleteWeight,
+                bestVolumeWeight = updated.bestVolumeWeight, bestVolumeReps = updated.bestVolumeReps,
+                measureType = updated.measureType.name,
+                bestSeconds = updated.bestSeconds, bestDistanceKm = updated.bestDistanceKm
+            ))
+        }
     }
 
     fun resetWorkout() {
@@ -568,7 +637,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun getDaysSinceLastWorkout(): Long? {
         val w = _completedWorkouts.value; if (w.isEmpty()) return null
-        return Duration.between(w.first().dateTime, LocalDateTime.now()).toDays()
+        // БАГ 5: считаем КАЛЕНДАРНЫЕ дни в местном времени, а не 24-часовые
+        // интервалы. Раньше тренировка "вчера вечером" (10 ч назад) через
+        // Duration.toDays() давала 0 → показывало "тренировался сегодня".
+        return ChronoUnit.DAYS.between(w.first().dateTime.toLocalDate(), LocalDate.now())
     }
     fun getWeightDifference(): Float? {
         val w = _completedWorkouts.value; if (w.size < 2) return null
@@ -577,6 +649,21 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     fun isExerciseRecord(name: String, weight: Float, reps: Int): Boolean {
         val r = _exerciseHistory.value[name] ?: return false
         return weight >= r.maxWeight && reps >= r.maxWeightReps
+    }
+
+    /**
+     * БАГ 3: рекордный ли это подход — с учётом типа упражнения.
+     * Используется для значка 🏆 на всех типах (не только вес×повторы).
+     */
+    fun isSetRecord(name: String, measureType: MeasureType, set: WorkoutSet): Boolean {
+        val r = _exerciseHistory.value[name] ?: return false
+        return when (measureType) {
+            MeasureType.WEIGHT_REPS -> set.weight > 0f && set.weight >= r.maxWeight
+            MeasureType.REPS        -> set.reps > 0 && set.reps >= r.maxReps
+            MeasureType.TIME        -> (set.seconds ?: 0) > 0 && (set.seconds ?: 0) >= (r.bestSeconds ?: 0)
+            MeasureType.DISTANCE    -> (set.distanceKm ?: 0f) > 0f && (set.distanceKm ?: 0f) >= (r.bestDistanceKm ?: 0f)
+            MeasureType.CARDIO      -> false
+        }
     }
     // ИСПРАВЛЕНО: раньше здесь был .asReversed(), что при DESC-порядке
     // списка означало перебор от САМОЙ СТАРОЙ тренировки к новой — отсюда

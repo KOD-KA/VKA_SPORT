@@ -439,8 +439,8 @@ private fun InlineExerciseBlock(
                             text = previousSet?.let { SetFormat.value(exercise.measureType, it) } ?: "—",
                             color = DarkGray, fontSize = 14.sp
                         )
-                        if (previousSet != null && exercise.measureType == MeasureType.WEIGHT_REPS &&
-                            viewModel.isExerciseRecord(exercise.name, previousSet.weight, previousSet.reps)) {
+                        if (previousSet != null &&
+                            viewModel.isSetRecord(exercise.name, exercise.measureType, previousSet)) {
                             Spacer(Modifier.width(4.dp))
                             Text("🏆", fontSize = 11.sp)
                         }
@@ -456,8 +456,7 @@ private fun InlineExerciseBlock(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(SetFormat.value(exercise.measureType, currentSet), color = Black, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                if (exercise.measureType == MeasureType.WEIGHT_REPS &&
-                                    viewModel.isExerciseRecord(exercise.name, currentSet.weight, currentSet.reps)) {
+                                if (viewModel.isSetRecord(exercise.name, exercise.measureType, currentSet)) {
                                     Spacer(Modifier.width(4.dp))
                                     Text("🏆", fontSize = 11.sp)
                                 }

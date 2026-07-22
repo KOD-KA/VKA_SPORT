@@ -4,6 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.onFocusEvent
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,6 +30,7 @@ import com.vkasport.app.ui.theme.Gold
 import com.vkasport.app.ui.theme.SoftGray
 import com.vkasport.app.ui.theme.White
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ExerciseSelectionScreen(
     muscleGroup: MuscleGroup,
@@ -67,7 +74,7 @@ fun ExerciseSelectionScreen(
 
         // ===== СПИСОК УПРАЖНЕНИЙ =====
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().imePadding(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -159,8 +166,14 @@ fun ExerciseSelectionScreen(
                         Text("Добавить своё упражнение", color = White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                     }
                 } else {
+                    val bringIntoView = remember { BringIntoViewRequester() }
+                    val scope = rememberCoroutineScope()
                     Column(
-                        modifier = Modifier.fillMaxWidth().background(SoftGray, RoundedCornerShape(12.dp)).padding(14.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SoftGray, RoundedCornerShape(12.dp))
+                            .padding(14.dp)
+                            .bringIntoViewRequester(bringIntoView)
                     ) {
                         Text("Название упражнения", fontSize = 12.sp, color = DarkGray, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(8.dp))
@@ -168,7 +181,11 @@ fun ExerciseSelectionScreen(
                             OutlinedTextField(
                                 value = customText,
                                 onValueChange = { customText = it },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .onFocusEvent { st ->
+                                        if (st.isFocused) scope.launch { bringIntoView.bringIntoView() }
+                                    },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(

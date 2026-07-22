@@ -59,7 +59,11 @@ object RestTimerNotification {
         val contentIntent = PendingIntent.getActivity(
             context,
             0,
-            Intent(context, MainActivity::class.java),
+            Intent(context, MainActivity::class.java).apply {
+                // Возвращаемся в СУЩЕСТВУЮЩУЮ тренировку (singleTop), не создаём
+                // новый экземпляр поверх — иначе таймер "пропадал" под новым экраном
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 

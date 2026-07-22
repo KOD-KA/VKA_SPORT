@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "VKA_SPORT"
+rootProject.name = "STYRK"
 include(":app")

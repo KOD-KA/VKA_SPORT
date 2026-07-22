@@ -419,6 +419,11 @@ private fun WorkoutDetailSheet(
                                 } else {
                                     Text(com.vkasport.app.ui.common.SetFormat.value(exercise.measureType, set), Modifier.weight(1f), color = Black, fontSize = 14.sp)
                                 }
+                                // БАГ 6: помечаем рекордный подход в деталях архива
+                                if (viewModel.isSetRecord(exercise.name, exercise.measureType, set)) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("🏆", fontSize = 12.sp)
+                                }
                             }
                             if (idx < exercise.sets.lastIndex)
                                 HorizontalDivider(color = SoftGray, thickness = 0.5.dp)
