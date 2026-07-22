@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -57,7 +58,15 @@ private val TIPS = listOf(
     Tip("🎯", "Техника важнее веса",
         "Слишком тяжёлый вес с нарушением техники почти всегда приводит к травмам и меньше нагружает целевую мышцу. Сначала закрепите правильную технику на умеренном весе, и только потом увеличивайте нагрузку."),
     Tip("💧", "Вода и разогрев суставов",
-        "Обезвоживание снижает силовые показатели и выносливость. Пейте воду небольшими порциями на протяжении всей тренировки, а не только до или после неё.")
+        "Обезвоживание снижает силовые показатели и выносливость. Пейте воду небольшими порциями на протяжении всей тренировки, а не только до или после неё."),
+    Tip("🏃", "Кардио и жиросжигание",
+        "Жир уходит от дефицита калорий, а кардио помогает его создать. 2–3 сессии в неделю по 20–40 минут (дорожка, велотренажёр, скакалка) — после силовой или в отдельный день. Ориентир по темпу: можете говорить, но петь уже тяжело."),
+    Tip("📏", "Замеряйте прогресс",
+        "Вес на весах — не вся правда: мышцы тяжелее жира. Раз в 2–4 недели записывайте замеры (талия, грудь, бицепс) в профиле — графики покажут реальные изменения, которых не видно в зеркале изо дня в день."),
+    Tip("⚠️", "Перетренированность",
+        "Постоянная усталость, падение рабочих весов, плохой сон и раздражительность — сигналы, что организм не успевает восстанавливаться. Сделайте лёгкую неделю: те же упражнения, но веса на 40–50% меньше. Рост происходит в отдыхе, а не на тренировке."),
+    Tip("🌬️", "Дыхание под нагрузкой",
+        "Усилие — выдох, опускание — вдох. На тяжёлых базовых допустимо короткое натуживание в момент подъёма, но не задерживайте дыхание на всю амплитуду — резко скачет давление.")
 )
 
 private data class ProgramDay(val label: String, val muscleGroup: String, val exercises: List<String>)
@@ -90,19 +99,157 @@ private val PROGRAMS = listOf(
             ProgramDay("День 2", "Спина", listOf("Становая тяга", "Тяга штанги в наклоне", "Подтягивания")),
             ProgramDay("День 3", "Плечи, руки", listOf("Жим штанги стоя", "Подъем штанги на бицепс", "Французский жим"))
         )
+    ),
+    Program(
+        title = "Фулбади 2 раза в неделю",
+        subtitle = "Всё тело за тренировку — когда мало времени",
+        days = listOf(
+            ProgramDay("День 1", "Всё тело", listOf("Приседания со штангой", "Жим штанги лёжа", "Тяга верхнего блока", "Планка")),
+            ProgramDay("День 2", "Всё тело", listOf("Румынская тяга", "Жим гантелей сидя", "Горизонтальная тяга блока", "Скручивания"))
+        )
+    ),
+    Program(
+        title = "Уличный воркаут",
+        subtitle = "Турник и брусья — зал не нужен",
+        days = listOf(
+            ProgramDay("День 1", "Улица", listOf("Подтягивания", "Отжимания на брусьях", "Отжимания")),
+            ProgramDay("День 2", "Улица", listOf("Австралийские подтягивания", "Уголок на турнике", "Берпи")),
+            ProgramDay("День 3", "Улица", listOf("Подтягивания", "Пистолетик (присед на одной ноге)", "Скакалка"))
+        )
+    ),
+    Program(
+        title = "Домашняя без оборудования",
+        subtitle = "Только собственный вес",
+        days = listOf(
+            ProgramDay("День 1", "Дом", listOf("Отжимания", "Приседания без веса", "Планка")),
+            ProgramDay("День 2", "Дом", listOf("Выпады на месте", "Обратные отжимания от стула", "Скалолаз")),
+            ProgramDay("День 3", "Дом", listOf("Берпи", "Ягодичный мостик", "Боковая планка"))
+        )
+    ),
+    Program(
+        title = "Жиросжигание",
+        subtitle = "Кардио 3 раза в неделю",
+        days = listOf(
+            ProgramDay("День 1", "Жиросжигание", listOf("Беговая дорожка", "Скакалка")),
+            ProgramDay("День 2", "Жиросжигание", listOf("Велотренажёр", "Ходьба в горку")),
+            ProgramDay("День 3", "Жиросжигание", listOf("Бег на улице", "Степпер"))
+        )
     )
 )
 
-private data class VideoItem(val title: String, val subtitle: String, val videoId: String) {
-    val watchUrl get() = "https://www.youtube.com/watch?v=$videoId"
-    val thumbnailUrl get() = "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
-}
+private data class VideoItem(val title: String, val subtitle: String, val watchUrl: String, val thumbnailUrl: String)
 
-private val VIDEOS = listOf(
-    VideoItem("Жим штанги лёжа", "Правильная техника", "nWo_m0REGMA"),
-    VideoItem("Становая тяга", "Разбор техники", "ofe8YeSF4F0"),
-    VideoItem("Приседания со штангой", "Техника и программа", "aXh2nVAq6-c"),
-    VideoItem("Подъём на бицепс", "Техника выполнения", "4VbAyt64r18")
+// YouTube-видео (техника)
+private fun yt(title: String, subtitle: String, id: String) = VideoItem(
+    title, subtitle,
+    "https://www.youtube.com/watch?v=$id",
+    "https://img.youtube.com/vi/$id/hqdefault.jpg"
+)
+
+// RUTUBE-видео (зарубежные атлеты). Обложку отдаёт API рутуба по id —
+// Coil загружает её по редиректу так же, как ютубовские превью.
+private fun rt(title: String, subtitle: String, id: String) = VideoItem(
+    title, subtitle,
+    "https://rutube.ru/video/$id/",
+    "https://rutube.ru/api/video/$id/thumbnail/?redirect=1"
+)
+
+private data class VideoSection(val title: String, val videos: List<VideoItem>)
+
+private val VIDEO_SECTIONS = listOf(
+    VideoSection("ТЕХНИКА УПРАЖНЕНИЙ", listOf(
+        yt("Жим штанги лёжа", "Правильная техника", "nWo_m0REGMA"),
+        yt("Становая тяга", "Разбор техники", "ofe8YeSF4F0"),
+        yt("Приседания со штангой", "Техника и программа", "aXh2nVAq6-c"),
+        yt("Подъём на бицепс", "Техника выполнения", "4VbAyt64r18")
+    )),
+    VideoSection("ЗВЁЗДЫ ЖЕЛЕЗА · RUTUBE", listOf(
+        rt("Арнольд: тренировка груди", "Классика от 7× Мистера Олимпия", "cb1bdb52558e62f54e0ff6777b7ac404"),
+        rt("Арнольд: программа, день 1", "Как тренировался Железный Арни", "94dc5afcb4af0d0e04f9b93596707899"),
+        rt("Арнольд: бицепс и трицепс", "Продвинутая программа рук", "9ee06938966af90ad0fa330b0dc18731"),
+        rt("Крис Бамстед: верх тела", "5× Мистер Олимпия Classic", "245f3dae535f69ffc23aa4808e245cd6"),
+        rt("Программа Криса Бамстеда", "Полный разбор на русском", "2ceb2ed3f2aecbc7e574b0571226d706"),
+        rt("Бамстед и Дэвид Лейд", "Совместная тренировка в Майами", "a468011ea28e81d106d6219bcb6e294a"),
+        rt("Ронни Коулмэн: плечи", "Убойная тренировка плеч", "ff6c33e2883685326360fda06b4ede42"),
+        rt("Коулмэн: жим ногами 1044 кг", "Легендарный рекорд", "a95ae4d511a36875884bfd4f9cfac440")
+    )),
+    VideoSection("ВОРКАУТ · RUTUBE", listOf(
+        rt("Программа Ганнибала", "Дойдёшь до конца?", "1ea40c9966fc0bf904c3ce3e945a68ee"),
+        rt("Ганнибал: 580 повторений", "Тренировка за 45 минут", "56c8011862e03ed585f24ea38d0f036a"),
+        rt("Ганнибал: база для новичков", "С чего начать воркаут", "a01b0cd700408ea79ecfe29146d4e453"),
+        rt("Крис Хериа: калистеника", "Тренировка с собственным весом", "d7a13190c9e0a746b292f1b4f0a4a095"),
+        rt("Крис Хериа: выход силой", "Обучение, часть 1", "cd408669f2c9fbbb2fd717dfb2218d87"),
+        rt("Крис Хериа: стойка на руках", "4 шага к стойке", "ba482e3f4621ce8ac7b29c109c522bf8")
+    )),
+    VideoSection("МОТИВАЦИЯ · RUTUBE", listOf(
+        rt("Дэвид Гоггинс: 10 минут", "Речь, меняющая жизнь", "f65bbf14a09262e6872dcc2b98e3c97b"),
+        rt("Гоггинс бежит и мотивирует", "Час дисциплины", "40748036de8f910aa521ddfcfee11d3e"),
+        rt("Гоггинс: жёсткая речь", "Мотивация для жизни", "abb95412f53d988cce8c277dbc6d7884"),
+        rt("Бамстед: мотивация в зале", "Настрой чемпиона", "f2309a14d320d2cb32ce6f67eed7fd15"),
+        rt("Коулмэн: light weight baby!", "Классика мотивации", "9a2e03afcca6c1ae3d083f5e3dde1aa0"),
+        rt("Ганнибал: король воркаута", "Street Workout мотивация", "af474b52390b061cdf8e5b022a334c9d")
+    ))
+)
+
+// ═══════════════════════════════════════════════════════════════════
+//  ТРЕНИРОВКИ ЛЕГЕНД
+// ═══════════════════════════════════════════════════════════════════
+
+private data class Legend(
+    val emoji: String,
+    val name: String,
+    val tagline: String,
+    val description: String,
+    val workout: List<String>
+)
+
+private val LEGENDS = listOf(
+    Legend("🏆", "Арнольд Шварценеггер", "7× Мистер Олимпия",
+        "Тренировался шесть дней в неделю, иногда дважды в день. Фирменный приём — " +
+                "суперсеты грудь+спина: жим лёжа сразу после подтягиваний, без отдыха. " +
+                "Верил в «памп» и полную ментальную концентрацию на рабочей мышце.",
+        listOf(
+            "Жим штанги лёжа — 5×8-12 (суперсет с подтягиваниями)",
+            "Подтягивания — 5× до отказа",
+            "Жим штанги на наклонной скамье — 4×10",
+            "Разводка гантелей лёжа — 4×10",
+            "Пуловер с гантелей — 4×12",
+            "Тяга штанги в наклоне — 4×10"
+        )),
+    Legend("👑", "Ганнибал Фор Кинг", "Легенда стрит-воркаута",
+        "Начал тренироваться на улицах Нью-Йорка, потому что не было денег на зал — " +
+                "так родился современный воркаут. Круговой метод: отжимания → турник → " +
+                "брусья без отдыха между упражнениями, 500+ повторений за тренировку.",
+        listOf(
+            "Круги-лесенки без отдыха:",
+            "Отжимания — 30, 29, 28 … 20",
+            "Подтягивания — 10, 9, 8 … 5",
+            "Отжимания на брусьях — 20, 19 … 10",
+            "Подтягивания обратным хватом — 10, 9 … 5",
+            "Итого за тренировку ~580 повторений"
+        )),
+    Legend("💪", "Ронни Коулмэн", "8× Мистер Олимпия",
+        "«Все хотят быть бодибилдерами, но никто не хочет поднимать тяжёлое железо». " +
+                "Тренировался как пауэрлифтер: тяжёлая база — присед 365 кг, " +
+                "жим ногами больше тонны. Yeah buddy! Light weight baby!",
+        listOf(
+            "Приседания со штангой — 5×10-12 (тяжёлые)",
+            "Жим ногами — 4×12",
+            "Выпады с гантелями — 3×12",
+            "Сгибание ног в тренажёре — 4×12",
+            "Румынская тяга — 4×10"
+        )),
+    Legend("🐺", "Дориан Йейтс", "6× Мистер Олимпия",
+        "Метод «кровь и кишки»: после разминочных — одна-единственная рабочая серия " +
+                "до полного отказа. Тренировки короткие (45-50 минут) и предельно тяжёлые. " +
+                "Всю карьеру вёл дневник тренировок — как вы в этом приложении.",
+        listOf(
+            "Тяга верхнего блока — разминка + 1×6-8 до отказа",
+            "Тяга штанги в наклоне — 1×6-8 до отказа",
+            "Тяга гантели одной рукой — 1×8 до отказа",
+            "Гиперэкстензия — 1×10-12",
+            "Становая тяга — 1×6-8"
+        ))
 )
 
 // ═══════════════════════════════════════════════════════════════════
@@ -173,6 +320,7 @@ private fun InfoTab(title: String, selected: Boolean, onClick: () -> Unit) {
 private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
     var expandedTip by remember { mutableStateOf<Int?>(null) }
     var expandedProgram by remember { mutableStateOf<Int?>(null) }
+    var expandedLegend by remember { mutableStateOf<Int?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -199,6 +347,15 @@ private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
                 onToggle = { expandedProgram = if (expanded) null else index },
                 onPlanDay = onPlanDay
             )
+        }
+
+        item { Spacer(Modifier.height(6.dp)) }
+        item { SectionLabel("ТРЕНИРОВКИ ЛЕГЕНД") }
+
+        items(LEGENDS.size) { index ->
+            val legend = LEGENDS[index]
+            val expanded = expandedLegend == index
+            LegendCard(legend, expanded) { expandedLegend = if (expanded) null else index }
         }
 
         // ── ВЕРСИЯ ПРИЛОЖЕНИЯ ────────────────────────────────────────
@@ -435,10 +592,18 @@ private fun VideoTab() {
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        items(VIDEOS.size) { index ->
-            val video = VIDEOS[index]
-            VideoCard(video) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.watchUrl)))
+        VIDEO_SECTIONS.forEach { section ->
+            item(span = { GridItemSpan(2) }) {
+                Column {
+                    Spacer(Modifier.height(4.dp))
+                    SectionLabel(section.title)
+                }
+            }
+            items(section.videos.size) { index ->
+                val video = section.videos[index]
+                VideoCard(video) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.watchUrl)))
+                }
             }
         }
     }
@@ -495,5 +660,40 @@ private fun SectionLabel(title: String) {
         HorizontalDivider(Modifier.weight(1f), color = LightGray)
         Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkGray)
         HorizontalDivider(Modifier.weight(1f), color = LightGray)
+    }
+}
+// ═══════════════════════════════════════════════════════════════════
+//  КАРТОЧКА ЛЕГЕНДЫ
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+private fun LegendCard(legend: Legend, expanded: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(Black, RoundedCornerShape(14.dp))
+            .clickable { onClick() }.padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(legend.emoji, fontSize = 20.sp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(legend.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = White)
+                Text(legend.tagline, fontSize = 11.sp, color = White.copy(alpha = 0.6f))
+            }
+            Text(if (expanded) "▲" else "▼", fontSize = 11.sp, color = White.copy(alpha = 0.6f))
+        }
+        if (expanded) {
+            Spacer(Modifier.height(10.dp))
+            Text(legend.description, fontSize = 12.sp, color = White.copy(alpha = 0.85f), lineHeight = 18.sp)
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = White.copy(alpha = 0.15f))
+            Spacer(Modifier.height(10.dp))
+            legend.workout.forEach { line ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                    Box(Modifier.size(5.dp).background(Gold, CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Text(line, fontSize = 12.sp, color = White, lineHeight = 17.sp)
+                }
+            }
+        }
     }
 }
