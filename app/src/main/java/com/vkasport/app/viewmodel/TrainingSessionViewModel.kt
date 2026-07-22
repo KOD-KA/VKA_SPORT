@@ -658,7 +658,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     fun isSetRecord(name: String, measureType: MeasureType, set: WorkoutSet): Boolean {
         val r = _exerciseHistory.value[name] ?: return false
         return when (measureType) {
-            MeasureType.WEIGHT_REPS -> set.weight > 0f && set.weight >= r.maxWeight
+            // Со своим весом (maxWeight = 0) рекорд считается по повторам
+            MeasureType.WEIGHT_REPS ->
+                if (r.maxWeight > 0f) set.weight > 0f && set.weight >= r.maxWeight
+                else set.reps > 0 && set.reps >= r.maxReps
             MeasureType.REPS        -> set.reps > 0 && set.reps >= r.maxReps
             MeasureType.TIME        -> (set.seconds ?: 0) > 0 && (set.seconds ?: 0) >= (r.bestSeconds ?: 0)
             MeasureType.DISTANCE    -> (set.distanceKm ?: 0f) > 0f && (set.distanceKm ?: 0f) >= (r.bestDistanceKm ?: 0f)

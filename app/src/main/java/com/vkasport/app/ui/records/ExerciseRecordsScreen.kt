@@ -111,6 +111,9 @@ fun ExerciseRecordsScreen(
     // ===== ПРОГРЕСС ПО УПРАЖНЕНИЮ (bottom sheet, тап по карточке) =====
     detailRecord?.let { rec ->
         val type = rec.measureType
+        // Упражнение со своим весом: тип вес×повторы, но веса нет (max = 0).
+        // Тогда прогресс и рекорд показываем по ПОВТОРАМ, а не по кг.
+        val bodyweight = type == MeasureType.WEIGHT_REPS && rec.maxWeight <= 0f
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val chartDateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yy") }
 
@@ -121,12 +124,13 @@ fun ExerciseRecordsScreen(
             completedWorkouts.mapNotNull { w ->
                 val sets = w.exercises.filter { it.name == rec.exerciseName }.flatMap { it.sets }
                 if (sets.isEmpty()) null else {
-                    val v: Float? = when (type) {
-                        MeasureType.WEIGHT_REPS -> sets.maxOf { it.weight }
-                        MeasureType.REPS -> sets.maxOf { it.reps }.toFloat()
-                        MeasureType.TIME -> sets.maxOf { it.seconds ?: 0 }.toFloat()
-                        MeasureType.DISTANCE -> sets.maxOf { it.distanceKm ?: 0f }
-                        MeasureType.CARDIO -> null
+                    val v: Float? = when {
+                        type == MeasureType.WEIGHT_REPS && bodyweight -> sets.maxOf { it.reps }.toFloat()
+                        type == MeasureType.WEIGHT_REPS -> sets.maxOf { it.weight }
+                        type == MeasureType.REPS -> sets.maxOf { it.reps }.toFloat()
+                        type == MeasureType.TIME -> sets.maxOf { it.seconds ?: 0 }.toFloat()
+                        type == MeasureType.DISTANCE -> sets.maxOf { it.distanceKm ?: 0f }
+                        else -> null
                     }
                     v?.let { value -> w.dateTime.toLocalDate() to value }
                 }
@@ -151,7 +155,7 @@ fun ExerciseRecordsScreen(
                 Spacer(Modifier.height(12.dp))
 
                 val mainTitle = when (type) {
-                    MeasureType.WEIGHT_REPS -> "МАКС. ВЕС ПО ТРЕНИРОВКАМ, КГ"
+                    MeasureType.WEIGHT_REPS -> if (bodyweight) "МАКС. ПОВТОРЫ ПО ТРЕНИРОВКАМ" else "МАКС. ВЕС ПО ТРЕНИРОВКАМ, КГ"
                     MeasureType.REPS -> "МАКС. ПОВТОРЫ ПО ТРЕНИРОВКАМ"
                     MeasureType.TIME -> "ЛУЧШЕЕ ВРЕМЯ ПО ТРЕНИРОВКАМ, СЕК"
                     MeasureType.DISTANCE -> "ДИСТАНЦИЯ ПО ТРЕНИРОВКАМ, КМ"
@@ -170,7 +174,7 @@ fun ExerciseRecordsScreen(
                 }
 
                 // Для классики — второй график: объём за тренировку
-                if (type == MeasureType.WEIGHT_REPS) {
+                if (type == MeasureType.WEIGHT_REPS && !bodyweight) {
                     Spacer(Modifier.height(12.dp))
                     val volumePoints = remember(rec.exerciseName, completedWorkouts) {
                         completedWorkouts.mapNotNull { w ->
@@ -259,39 +263,52 @@ private fun RecordCard(record: ExerciseHistory, isPrimary: Boolean, onClick: () 
                     subDate  = record.athleteWeight?.let { "%.1f кг".format(it) }
                 )
                 else -> {
-                    // ─ МАКС. ВЕС ────────────────────────────────────
-                    MetricRow(
-                        icon        = "🏆",
-                        label       = "макс. вес",
-                        bigValue    = "${record.maxWeight.toInt()}",
-                        subValue    = "× ${record.maxWeightReps}",
-                        date        = record.recordDate?.format(dateFmt),
-                        subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
-                    )
+                    if (record.maxWeight > 0f) {
+                        // ─ МАКС. ВЕС ────────────────────────────────
+                        MetricRow(
+                            icon        = "🏆",
+                            label       = "макс. вес",
+                            bigValue    = "${record.maxWeight.toInt()}",
+                            subValue    = "× ${record.maxWeightReps}",
+                            date        = record.recordDate?.format(dateFmt),
+                            subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
+                        )
 
-                    // Толстый разделитель
-                    Spacer(Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.5.dp)
-                            .background(DarkGray.copy(alpha = 0.22f))
-                    )
-                    Spacer(Modifier.height(10.dp))
+                        // Толстый разделитель
+                        Spacer(Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.5.dp)
+                                .background(DarkGray.copy(alpha = 0.22f))
+                        )
+                        Spacer(Modifier.height(10.dp))
 
-                    // ─ МАКС. ОБЪЁМ ──────────────────────────────────
-                    val volSubValue = if (record.bestVolumeWeight != null && record.bestVolumeReps != null)
-                        "${fmtW(record.bestVolumeWeight)} × ${record.bestVolumeReps}"
-                    else "кг"
+                        // ─ МАКС. ОБЪЁМ ──────────────────────────────
+                        val volSubValue = if (record.bestVolumeWeight != null && record.bestVolumeReps != null)
+                            "${fmtW(record.bestVolumeWeight)} × ${record.bestVolumeReps}"
+                        else "кг"
 
-                    MetricRow(
-                        icon        = "📊",
-                        label       = "макс. объём",
-                        bigValue    = "${record.bestVolume.toInt()}",
-                        subValue    = volSubValue,
-                        date        = record.recordDate?.format(dateFmt),
-                        subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
-                    )
+                        MetricRow(
+                            icon        = "📊",
+                            label       = "макс. объём",
+                            bigValue    = "${record.bestVolume.toInt()}",
+                            subValue    = volSubValue,
+                            date        = record.recordDate?.format(dateFmt),
+                            subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
+                        )
+                    } else {
+                        // Упражнение со СВОИМ ВЕСОМ (без отягощения): вес и
+                        // объём в кг = 0, поэтому рекорд — по числу повторов
+                        MetricRow(
+                            icon        = "🏆",
+                            label       = "макс. повторов (свой вес)",
+                            bigValue    = "${record.maxReps}",
+                            subValue    = "повт.",
+                            date        = record.recordDate?.format(dateFmt),
+                            subDate     = record.athleteWeight?.let { "%.1f кг".format(it) }
+                        )
+                    }
                 }
             }
         }

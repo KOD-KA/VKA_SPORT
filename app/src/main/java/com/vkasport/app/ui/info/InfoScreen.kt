@@ -202,7 +202,11 @@ private data class Legend(
     val name: String,
     val tagline: String,
     val description: String,
-    val workout: List<String>
+    val workout: List<String>,
+    // Для планирования «попробовать повторить» — как у готовых программ:
+    // группа-ярлык и чистые названия упражнений из библиотеки
+    val muscleGroup: String,
+    val plannableExercises: List<String>
 )
 
 private val LEGENDS = listOf(
@@ -217,7 +221,10 @@ private val LEGENDS = listOf(
             "Разводка гантелей лёжа — 4×10",
             "Пуловер с гантелей — 4×12",
             "Тяга штанги в наклоне — 4×10"
-        )),
+        ),
+        muscleGroup = "Грудь, спина",
+        plannableExercises = listOf("Жим штанги лёжа", "Подтягивания", "Жим штанги на наклонной скамье", "Разводка гантелей лёжа", "Пуловер с гантелей", "Тяга штанги в наклоне")
+    ),
     Legend("👑", "Ганнибал Фор Кинг", "Легенда стрит-воркаута",
         "Начал тренироваться на улицах Нью-Йорка, потому что не было денег на зал — " +
                 "так родился современный воркаут. Круговой метод: отжимания → турник → " +
@@ -229,7 +236,10 @@ private val LEGENDS = listOf(
             "Отжимания на брусьях — 20, 19 … 10",
             "Подтягивания обратным хватом — 10, 9 … 5",
             "Итого за тренировку ~580 повторений"
-        )),
+        ),
+        muscleGroup = "Улица",
+        plannableExercises = listOf("Отжимания", "Подтягивания", "Отжимания на брусьях")
+    ),
     Legend("💪", "Ронни Коулмэн", "8× Мистер Олимпия",
         "«Все хотят быть бодибилдерами, но никто не хочет поднимать тяжёлое железо». " +
                 "Тренировался как пауэрлифтер: тяжёлая база — присед 365 кг, " +
@@ -240,7 +250,10 @@ private val LEGENDS = listOf(
             "Выпады с гантелями — 3×12",
             "Сгибание ног в тренажёре — 4×12",
             "Румынская тяга — 4×10"
-        )),
+        ),
+        muscleGroup = "Ноги",
+        plannableExercises = listOf("Приседания со штангой", "Жим ногами", "Выпады с гантелями", "Сгибание ног в тренажёре", "Румынская тяга")
+    ),
     Legend("🐺", "Дориан Йейтс", "6× Мистер Олимпия",
         "Метод «кровь и кишки»: после разминочных — одна-единственная рабочая серия " +
                 "до полного отказа. Тренировки короткие (45-50 минут) и предельно тяжёлые. " +
@@ -251,7 +264,10 @@ private val LEGENDS = listOf(
             "Тяга гантели одной рукой — 1×8 до отказа",
             "Гиперэкстензия — 1×10-12",
             "Становая тяга — 1×6-8"
-        )),
+        ),
+        muscleGroup = "Спина",
+        plannableExercises = listOf("Тяга верхнего блока", "Тяга штанги в наклоне", "Тяга гантели одной рукой", "Гиперэкстензия", "Становая тяга")
+    ),
     Legend("🇷🇺", "Андрей Смаев", "МСМК по стритлифтингу",
         "Русский богатырь из посёлка Сатис. Начинал с дворовых турников, а сейчас " +
                 "подтягивается с дополнительным весом +170 кг и жмёт лёжа за 300 кг. " +
@@ -263,7 +279,10 @@ private val LEGENDS = listOf(
             "Становая тяга — 5×5",
             "Гиперэкстензия — 3×15",
             "Плюс объёмный день: 300 подтягиваний + 180 брусья"
-        ))
+        ),
+        muscleGroup = "Улица",
+        plannableExercises = listOf("Подтягивания", "Отжимания на брусьях", "Жим штанги лёжа", "Становая тяга", "Гиперэкстензия")
+    )
 )
 
 // ═══════════════════════════════════════════════════════════════════
@@ -369,7 +388,11 @@ private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
         items(LEGENDS.size) { index ->
             val legend = LEGENDS[index]
             val expanded = expandedLegend == index
-            LegendCard(legend, expanded) { expandedLegend = if (expanded) null else index }
+            LegendCard(
+                legend = legend,
+                expanded = expanded,
+                onPlan = { onPlanDay(ProgramDay(legend.name, legend.muscleGroup, legend.plannableExercises)) }
+            ) { expandedLegend = if (expanded) null else index }
         }
 
         // ── ВЕРСИЯ ПРИЛОЖЕНИЯ ────────────────────────────────────────
@@ -681,7 +704,7 @@ private fun SectionLabel(title: String) {
 // ═══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun LegendCard(legend: Legend, expanded: Boolean, onClick: () -> Unit) {
+private fun LegendCard(legend: Legend, expanded: Boolean, onPlan: () -> Unit, onClick: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth().background(Black, RoundedCornerShape(14.dp))
             .clickable { onClick() }.padding(horizontal = 14.dp, vertical = 12.dp)
@@ -693,6 +716,18 @@ private fun LegendCard(legend: Legend, expanded: Boolean, onClick: () -> Unit) {
                 Text(legend.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = White)
                 Text(legend.tagline, fontSize = 11.sp, color = White.copy(alpha = 0.6f))
             }
+            // «+» — запланировать (попробовать повторить) тренировку легенды.
+            // Своя clickable-зона, тап по ней не разворачивает карточку.
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(White, CircleShape)
+                    .clickable { onPlan() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", color = Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(10.dp))
             Text(if (expanded) "▲" else "▼", fontSize = 11.sp, color = White.copy(alpha = 0.6f))
         }
         if (expanded) {
