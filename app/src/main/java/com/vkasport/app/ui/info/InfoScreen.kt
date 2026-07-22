@@ -384,7 +384,7 @@ private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "VKA SPORT" + (versionName?.let { " · v$it" } ?: ""),
+                text = "STYRK" + (versionName?.let { " · v$it" } ?: ""),
                 fontSize = 11.sp,
                 color = DarkGray,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
