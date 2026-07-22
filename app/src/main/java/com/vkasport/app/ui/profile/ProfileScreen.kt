@@ -1,5 +1,6 @@
 package com.vkasport.app.ui.profile
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -403,6 +404,43 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             importLauncher.launch(arrayOf("*/*"))
         }
 
+        Spacer(Modifier.height(24.dp))
+
+        // ===== ПОДДЕРЖАТЬ АВТОРА =====
+        Text("ПОДДЕРЖКА", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Black, RoundedCornerShape(16.dp))
+                .clickable {
+                    // Открываем страницу поддержки во внешнем браузере/приложении.
+                    // try/catch на случай, если на устройстве нет браузера.
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(DONATION_URL))
+                        )
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("❤️", fontSize = 22.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Поддержать автора", color = White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Приложение развивается силами одного человека. Любая поддержка помогает добавлять новые функции.",
+                    color = White.copy(alpha = 0.7f), fontSize = 11.sp, lineHeight = 15.sp
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("→", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+
         Spacer(Modifier.weight(1f, fill = true))
         Spacer(Modifier.height(28.dp))
 
@@ -632,3 +670,8 @@ private fun StandardCard(
         }
     }
 }
+
+// Ссылка на страницу поддержки автора (Boosty). Поменять здесь при
+// необходимости — единственное место, где задаётся адрес.
+private const val DONATION_URL =
+    "https://boosty.to/rstrtrt1/purchase/4022729?ssource=DIRECT&share=subscription_link"
