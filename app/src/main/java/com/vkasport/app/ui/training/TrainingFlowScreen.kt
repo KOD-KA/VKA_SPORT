@@ -88,7 +88,10 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                 fun confirmWeight() {
                     liveWeight?.let { w -> viewModel.updateAthleteWeight(w) }
                     focusManager.clearFocus()
-                    viewModel.setCurrentScreen("muscles")
+                    // Если упражнения уже загружены (запуск плановой тренировки) —
+                    // сразу к тренировке, иначе к выбору групп мышц
+                    if (state.selectedExercises.isNotEmpty()) viewModel.setCurrentScreen("training")
+                    else viewModel.setCurrentScreen("muscles")
                 }
 
                 OutlinedTextField(

@@ -306,8 +306,8 @@ private fun WeekTab(
                         val hasPlan = plannedByDate.containsKey(date)
                         val isSel   = date == selectedDate
                         val isTod   = date == today
-                        Box(Modifier.size(cell).padding(3.dp).background(
-                            if (isSel) White.copy(.18f) else Color.Transparent, RoundedCornerShape(10.dp))
+                        Box(Modifier.width(cell).height(72.dp).padding(3.dp).background(
+                            if (isSel) White.copy(.18f) else Color.Transparent, RoundedCornerShape(12.dp))
                             .clickable { selectedDate = if (selectedDate == date) null else date },
                             contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -317,7 +317,7 @@ private fun WeekTab(
                                     color = if (isTod) Gold else if (isSel) White else White.copy(.88f),
                                     fontSize = 20.sp, fontWeight = if (isTod || isSel) FontWeight.Bold else FontWeight.Normal)
                                 Spacer(Modifier.height(3.dp))
-                                Box(Modifier.size(5.dp).background(if (hasPlan) Blue else Color.Transparent, CircleShape))
+                                Box(Modifier.size(7.dp).background(if (hasPlan) Blue else Color.Transparent, CircleShape))
                             }
                         }
                     }
@@ -338,7 +338,11 @@ private fun WeekTab(
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(selDayPlanned, key = { it.id }) { planned ->
-                PlannedWorkoutCard(planned = planned, onDelete = { viewModel.deletePlannedWorkout(planned.id) })
+                PlannedWorkoutCard(
+                    planned = planned,
+                    onStart = { viewModel.startPlannedWorkout(planned) },
+                    onDelete = { viewModel.deletePlannedWorkout(planned.id) }
+                )
             }
 
             item {
@@ -377,7 +381,7 @@ private fun WeekTab(
 // ═══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun PlannedWorkoutCard(planned: PlannedWorkout, onDelete: () -> Unit) {
+private fun PlannedWorkoutCard(planned: PlannedWorkout, onStart: () -> Unit, onDelete: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(SoftGray, RoundedCornerShape(14.dp))) {
         // Шапка
         Box(Modifier.fillMaxWidth()
@@ -402,6 +406,16 @@ private fun PlannedWorkoutCard(planned: PlannedWorkout, onDelete: () -> Unit) {
                         Spacer(Modifier.width(8.dp))
                         Text(ex, fontSize = 13.sp, color = Black)
                     }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            // Начать тренировку (можно и заранее, до даты плана)
+            Box(Modifier.fillMaxWidth().height(46.dp)
+                .background(Black, RoundedCornerShape(10.dp))
+                .clickable { onStart() }, contentAlignment = Alignment.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("▶", color = White, fontSize = 12.sp)
+                    Text("Начать тренировку", color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(Modifier.height(8.dp))

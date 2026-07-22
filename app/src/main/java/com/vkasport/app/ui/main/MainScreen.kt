@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,6 +57,12 @@ fun MainScreen(
     val database = remember { AppDatabaseProvider.getDatabase(context) }
     val trainingViewModel = remember { TrainingSessionViewModel(database) }
     val trainingState by trainingViewModel.state.collectAsState()
+
+    // Запуск плановой тренировки из календаря — переключаемся на вкладку 0
+    val navToTraining by trainingViewModel.navigateToTraining.collectAsState()
+    LaunchedEffect(navToTraining) {
+        if (navToTraining > 0) pagerState.animateScrollToPage(0)
+    }
 
     // ЕДИНСТВЕННЫЙ источник правды для статус-бара во всём приложении.
     // Вкладка 0 (тренировка): все под-экраны чёрные, кроме "muscles".

@@ -50,6 +50,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     val customExercises   = _customExercises.asStateFlow()
     val lastCompletedWorkoutId = _lastCompletedWorkoutId.asStateFlow()
     val restTimerStart = _restTimerStart.asStateFlow()
+
+    // Сигнал MainScreen'у переключиться на вкладку тренировки (счётчик-триггер)
+    private val _navigateToTraining = MutableStateFlow(0)
+    val navigateToTraining = _navigateToTraining.asStateFlow()
     val bodyMetrics = _bodyMetrics.asStateFlow()
 
     // ВАЖНЫЙ ИНВАРИАНТ: _completedWorkouts ВСЕГДА отсортирован по dateTime
@@ -211,6 +215,35 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun updateAthleteWeight(w: Float) { setState(_state.value.copy(athleteWeight = w)) }
     fun startTraining() { setState(_state.value.copy(trainingStarted = true, currentScreen = "weight")) }
+
+    /**
+     * Запуск ЗАПЛАНИРОВАННОЙ тренировки (в т.ч. заранее, до её даты).
+     * Загружает упражнения плана в сессию, определяет их группу и тип
+     * измерения из библиотеки или своих упражнений, открывает ввод веса
+     * → сразу тренировку. Переключение вкладки делает MainScreen.
+     */
+    fun startPlannedWorkout(pw: PlannedWorkout) {
+        val exercises = pw.exercises.map { name ->
+            val cat = ExerciseLibrary.exercises.find { it.name.equals(name, ignoreCase = true) }
+            val custom = _customExercises.value.find { it.name.equals(name, ignoreCase = true) }
+            WorkoutExercise(
+                name = name,
+                muscleGroup = cat?.muscleGroup ?: custom?.muscleGroup,
+                measureType = cat?.measureType ?: custom?.measureType ?: MeasureType.WEIGHT_REPS
+            )
+        }
+        val lastWeight = _completedWorkouts.value.firstOrNull()?.athleteWeight
+        _restTimerStart.value = null
+        setState(CurrentWorkoutState(
+            workoutStartTime = LocalDateTime.now(),
+            athleteWeight = lastWeight,
+            selectedMuscleGroup = exercises.firstOrNull()?.muscleGroup,
+            selectedExercises = exercises,
+            trainingStarted = true,
+            currentScreen = "weight"
+        ))
+        _navigateToTraining.value = _navigateToTraining.value + 1
+    }
     fun setCurrentScreen(s: String) {
         // Запускаем таймер отдыха при первом входе на экран тренировки,
         // чтобы он показывал время ещё до первого записанного подхода
