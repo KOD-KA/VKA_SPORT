@@ -31,11 +31,16 @@ object BackupManager {
 
     const val FORMAT_VERSION = 3
 
+    // Идентификатор приложения в файле бэкапа. STYRK — текущий, VKA_SPORT —
+    // историческое имя до ребрендинга (импорт принимает оба).
+    private const val APP_ID = "STYRK"
+    private const val LEGACY_APP_ID = "VKA_SPORT"
+
     // ==================== ЭКСПОРТ (всегда в новейшем формате) ====================
 
     suspend fun exportJson(db: WorkoutDatabase): String = withContext(Dispatchers.IO) {
         val root = JSONObject()
-        root.put("app", "VKA_SPORT")
+        root.put("app", APP_ID)
         root.put("formatVersion", FORMAT_VERSION)
         root.put("exportedAt", System.currentTimeMillis())
 
@@ -151,11 +156,14 @@ object BackupManager {
         val root = try {
             JSONObject(json)
         } catch (e: Exception) {
-            throw IllegalArgumentException("Файл не является бэкапом VKA SPORT")
+            throw IllegalArgumentException("Файл не является бэкапом STYRK")
         }
 
-        if (root.optString("app") != "VKA_SPORT") {
-            throw IllegalArgumentException("Файл не является бэкапом VKA SPORT")
+        // Принимаем и новый идентификатор STYRK, и старый VKA_SPORT —
+        // бэкапы, сделанные до переименования, обязаны открываться.
+        val appId = root.optString("app")
+        if (appId != APP_ID && appId != LEGACY_APP_ID) {
+            throw IllegalArgumentException("Файл не является бэкапом STYRK")
         }
 
         when (val v = root.optInt("formatVersion", -1)) {
