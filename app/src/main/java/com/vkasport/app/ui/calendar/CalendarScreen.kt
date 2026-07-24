@@ -76,7 +76,7 @@ fun CalendarScreen(viewModel: TrainingSessionViewModel) {
         when (selectedTab) {
             0 -> MonthTab(workoutsByDate, recordDays, plannedByDate, exerciseHistory,
                 onWorkoutClick = { detailWorkout = it })
-            1 -> WeekTab(plannedWorkouts, plannedByDate, viewModel)
+            1 -> WeekTab(plannedByDate, viewModel)
         }
     }
 
@@ -266,7 +266,6 @@ private fun MonthDayCell(dayNum: Int, cell: Dp, hasWorkout: Boolean, isRecord: B
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeekTab(
-    plannedWorkouts: List<PlannedWorkout>,
     plannedByDate:   Map<LocalDate, List<PlannedWorkout>>,
     viewModel:       TrainingSessionViewModel
 ) {
@@ -369,8 +368,7 @@ private fun WeekTab(
                 onSave      = { date, hour, min, mg, exercises ->
                     viewModel.addPlannedWorkout(date, hour, min, mg, exercises)
                     showAddSheet = false
-                },
-                onDismiss = { showAddSheet = false }
+                }
             )
         }
     }
@@ -436,8 +434,7 @@ private fun PlannedWorkoutCard(planned: PlannedWorkout, onStart: () -> Unit, onD
 @Composable
 private fun AddPlannedWorkoutSheet(
     initialDate: LocalDate, weekStart: LocalDate,
-    onSave: (LocalDate, Int, Int, String, List<String>) -> Unit,
-    onDismiss: () -> Unit
+    onSave: (LocalDate, Int, Int, String, List<String>) -> Unit
 ) {
     var selDate by remember { mutableStateOf(initialDate) }
     var hourStr  by remember { mutableStateOf("19") }
@@ -512,7 +509,7 @@ private fun AddPlannedWorkoutSheet(
                 Text("Группа мышц", fontSize = 12.sp, color = DarkGray, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(8.dp))
                 // 2 строки чипов
-                val groups = MuscleGroup.values().toList()
+                val groups = MuscleGroup.entries
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (row in groups.chunked(3)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

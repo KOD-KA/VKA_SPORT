@@ -8,8 +8,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.core.net.toUri
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -35,7 +34,6 @@ import com.vkasport.app.ui.theme.SoftGray
 import com.vkasport.app.ui.theme.White
 import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import android.content.Intent
-import android.net.Uri
 import java.time.LocalDate
 import java.time.format.TextStyle as JTextStyle
 import java.util.Locale
@@ -324,8 +322,7 @@ fun InfoScreen(viewModel: TrainingSessionViewModel) {
                 onSave = { date, hour, minute ->
                     viewModel.addPlannedWorkout(date, hour, minute, day.muscleGroup, day.exercises)
                     planningDay = null
-                },
-                onDismiss = { planningDay = null }
+                }
             )
         }
     }
@@ -401,7 +398,7 @@ private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
             val versionName = remember {
                 try {
                     context.packageManager.getPackageInfo(context.packageName, 0).versionName
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     null
                 }
             }
@@ -410,7 +407,7 @@ private fun TipsTab(onPlanDay: (ProgramDay) -> Unit) {
                 text = "STYRK" + (versionName?.let { " · v$it" } ?: ""),
                 fontSize = 11.sp,
                 color = DarkGray,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
@@ -524,8 +521,7 @@ private fun ProgramDayRow(day: ProgramDay, onPlanClick: () -> Unit) {
 @Composable
 private fun QuickPlanSheet(
     day: ProgramDay,
-    onSave: (LocalDate, Int, Int) -> Unit,
-    onDismiss: () -> Unit
+    onSave: (LocalDate, Int, Int) -> Unit
 ) {
     val today = LocalDate.now()
     val next14Days = remember { (0..13).map { today.plusDays(it.toLong()) } }
@@ -639,7 +635,7 @@ private fun VideoTab() {
             items(section.videos.size) { index ->
                 val video = section.videos[index]
                 VideoCard(video) {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(video.watchUrl)))
+                    context.startActivity(Intent(Intent.ACTION_VIEW, video.watchUrl.toUri()))
                 }
             }
         }
