@@ -28,6 +28,10 @@ val White =
 val Gold =
     Color(0xFFC9A84C)
 
+// Светлый фон страницы тренировки, чтобы белые карточки не сливались (п10)
+val TrainingBg =
+    Color(0xFFF0F0F3)
+
 
 // LIGHT THEME
 

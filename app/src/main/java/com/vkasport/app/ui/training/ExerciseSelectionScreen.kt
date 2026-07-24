@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -74,7 +73,10 @@ fun ExerciseSelectionScreen(
 
         // ===== СПИСОК УПРАЖНЕНИЙ =====
         LazyColumn(
-            modifier = Modifier.fillMaxSize().imePadding(),
+            // п9: imePadding УБРАН — окно и так ужимается (adjustResize в манифесте),
+            // а двойной инсет создавал белую полосу над клавиатурой. Поле
+            // поднимается в зону видимости через bringIntoView (см. ниже).
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {

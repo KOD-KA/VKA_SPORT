@@ -30,6 +30,7 @@ import com.vkasport.app.viewmodel.TrainingSessionViewModel
 import com.vkasport.app.ui.theme.Black
 import com.vkasport.app.ui.theme.DarkGray
 import com.vkasport.app.ui.theme.SoftGray
+import com.vkasport.app.ui.theme.TrainingBg
 import com.vkasport.app.ui.theme.White
 import java.time.format.DateTimeFormatter
 
@@ -124,7 +125,9 @@ fun TrainingScreen(
 
         // ===== СПИСОК ГРУПП МЫШЦ + УПРАЖНЕНИЙ =====
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            // п10: светло-серый фон, чтобы белые карточки упражнений
+            // не сливались с фоном страницы
+            modifier = Modifier.weight(1f).background(TrainingBg),
             contentPadding = PaddingValues(bottom = 8.dp)
         ) {
             groupedExercises.forEach { (group, exercises) ->

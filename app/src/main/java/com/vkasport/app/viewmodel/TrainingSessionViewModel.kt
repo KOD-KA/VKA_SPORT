@@ -314,7 +314,9 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         val base = ExerciseHistory(exerciseName = name, measureType = mt)
         val updated: ExerciseHistory = when (mt) {
             MeasureType.WEIGHT_REPS -> {
-                val maxW = srcs.maxByOrNull { it.set.weight }!!
+                val maxWeightVal = srcs.maxOf { it.set.weight }
+                // среди подходов с максимальным весом берём тот, где больше повторов
+                val maxW = srcs.filter { it.set.weight == maxWeightVal }.maxByOrNull { it.set.reps }!!
                 val maxV = srcs.maxByOrNull { it.set.weight * it.set.reps }!!
                 base.copy(
                     maxWeight = maxW.set.weight,
@@ -522,12 +524,19 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     fun updateExerciseStats(exerciseName: String, weight: Float, reps: Int) {
         val volume = weight * reps
         val cur = _exerciseHistory.value[exerciseName]
-        val isNewWeight  = weight > (cur?.maxWeight  ?: 0f)
+        val curMaxWeight = cur?.maxWeight ?: 0f
+        val isNewWeight  = weight > curMaxWeight
         val isNewVolume  = volume > (cur?.bestVolume ?: 0f)
         val updated = ExerciseHistory(
             exerciseName     = exerciseName,
-            maxWeight        = maxOf(cur?.maxWeight ?: 0f, weight),
-            maxWeightReps    = if (isNewWeight) reps else (cur?.maxWeightReps ?: 0),
+            maxWeight        = maxOf(curMaxWeight, weight),
+            // повторы рекордного подхода: при новом макс.весе — эти повторы;
+            // при том же весе — лучшие повторы; иначе прежние
+            maxWeightReps    = when {
+                weight > curMaxWeight  -> reps
+                weight == curMaxWeight -> maxOf(cur?.maxWeightReps ?: 0, reps)
+                else                   -> cur?.maxWeightReps ?: 0
+            },
             maxReps          = maxOf(cur?.maxReps ?: 0, reps),
             bestVolume       = maxOf(cur?.bestVolume ?: 0f, volume),
             recordDate       = if (isNewWeight) LocalDateTime.now() else cur?.recordDate ?: LocalDateTime.now(),
@@ -693,7 +702,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         return when (measureType) {
             // Со своим весом (maxWeight = 0) рекорд считается по повторам
             MeasureType.WEIGHT_REPS ->
-                if (r.maxWeight > 0f) set.weight > 0f && set.weight >= r.maxWeight
+                // Рекорд = максимальный вес И при этом не меньше повторов, чем
+                // в рекордном подходе. Иначе 45×9 ошибочно считался рекордом
+                // наравне с 45×10 (тот же вес, но меньше повторов).
+                if (r.maxWeight > 0f) set.weight > 0f && set.weight >= r.maxWeight && set.reps >= r.maxWeightReps
                 else set.reps > 0 && set.reps >= r.maxReps
             MeasureType.REPS        -> set.reps > 0 && set.reps >= r.maxReps
             MeasureType.TIME        -> (set.seconds ?: 0) > 0 && (set.seconds ?: 0) >= (r.bestSeconds ?: 0)

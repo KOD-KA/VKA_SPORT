@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -61,7 +63,22 @@ fun MainScreen(
     // Запуск плановой тренировки из календаря — переключаемся на вкладку 0
     val navToTraining by trainingViewModel.navigateToTraining.collectAsState()
     LaunchedEffect(navToTraining) {
-        if (navToTraining > 0) pagerState.animateScrollToPage(0)
+        if (navToTraining > 0) pagerState.animateScrollToPage(0, animationSpec = tween(420))
+    }
+
+    // п6: системная кнопка «назад» на под-экранах тренировки возвращает
+    // на предыдущий под-экран (в т.ч. с «введите вес» → на старт), а не
+    // сворачивает приложение. Активен только когда открыта вкладка тренировки.
+    BackHandler(
+        enabled = pagerState.currentPage == 0 &&
+                trainingState.currentScreen in listOf("weight", "muscles", "exercises")
+    ) {
+        when (trainingState.currentScreen) {
+            "weight"    -> trainingViewModel.setCurrentScreen("start")
+            "muscles"   -> trainingViewModel.setCurrentScreen(
+                if (trainingState.selectedExercises.isEmpty()) "weight" else "training")
+            "exercises" -> trainingViewModel.setCurrentScreen("muscles")
+        }
     }
 
     // ЕДИНСТВЕННЫЙ источник правды для статус-бара во всём приложении.
@@ -81,7 +98,7 @@ fun MainScreen(
                     selectedIndex = pagerState.currentPage
                 ) { index ->
                     coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
+                        pagerState.animateScrollToPage(index, animationSpec = tween(420))
                     }
                 }
             }
