@@ -6,16 +6,21 @@ import kotlin.math.roundToInt
  * Оценка сожжённых калорий за тренировку по MET
  * (metabolic equivalent of task): ккал = MET × вес(кг) × время(ч).
  *
- * БАГ 7 (переписано): раньше вся силовая часть считалась от ОБЩЕЙ
- * длительности тренировки. Если пользователь вводил тренировку быстро
- * (длительность 10 сек), 100 отжиманий давали ~8 ккал — бессмыслица.
+ * ПЕРЕРАБОТАНО (п3, v1.5.1). Прошлая версия считала ТОЛЬКО активное время
+ * подходов и игнорировала общую длительность — из-за этого длинная
+ * тренировка (2ч40, 11 тонн) давала лишь ~356 ккал: время отдыха между
+ * подходами вообще не учитывалось.
  *
- * Теперь активное время считается ИЗ САМИХ ПОДХОДОВ и не зависит от
- * длительности на секундомере:
- *  - силовые / повторы: ~3 секунды активной работы на повтор
- *  - статика (время): по записанным секундам удержания
- *  - кардио / дистанция: по записанному времени (а если время не
- *    введено, оценивается из дистанции при скорости ~9 км/ч)
+ * Новая модель разделяет тренировку на три части:
+ *  1. Кардио (дорожка/вело/скакалка…) — по записанному времени и своему MET.
+ *  2. Активная силовая работа — оценка из подходов/повторов
+ *     (≈3 сек/повтор, но не меньше ≈30 сек на подход) при «энергичном» MET.
+ *     Статика (планка/вис) — по записанным секундам удержания.
+ *  3. Отдых/остальное время тренировки (общая длительность минус активное
+ *     время) — при низком MET (стоя/лёгкая активность между подходами).
+ *
+ * Так короткая быстрозаписанная тренировка получает адекватный «пол» по
+ * подходам, а длинная — учитывает всё время в зале.
  *
  * Это оценка, а не измерение: реальный расход зависит от интенсивности,
  * пульса и обмена веществ.
@@ -23,9 +28,11 @@ import kotlin.math.roundToInt
 object CalorieCalculator {
 
     private const val DEFAULT_BODY_WEIGHT = 75f
-    private const val SECONDS_PER_REP = 3f    // активное время на один повтор
-    private const val STRENGTH_MET = 5.0f     // силовая работа с усилием
-    private const val ISOMETRIC_MET = 4.0f    // статика: планка, вис, удержание
+    private const val SECONDS_PER_REP = 3f       // активная работа на повтор
+    private const val MIN_SECONDS_PER_SET = 30f  // подход длится не меньше ~30 сек
+    private const val STRENGTH_ACTIVE_MET = 6.0f // энергичная силовая работа
+    private const val ISOMETRIC_MET = 4.0f       // статика: планка, вис, удержание
+    private const val REST_MET = 1.8f            // отдых/стоя между подходами
     private const val DEFAULT_CARDIO_MET = 7f
 
     // MET по названию кардио-упражнения (умеренная интенсивность)
@@ -43,17 +50,19 @@ object CalorieCalculator {
         "Плавание"         to 7.0f
     )
 
-    /**
-     * durationMinutes больше НЕ используется для расчёта (оставлен в
-     * сигнатуре для совместимости вызовов) — время берётся из подходов.
-     */
     fun estimateKcal(
         exercises: List<WorkoutExercise>,
         durationMinutes: Long,
         athleteWeight: Float?
     ): Int {
         val weight = athleteWeight ?: DEFAULT_BODY_WEIGHT
-        var kcal = 0f
+
+        var cardioKcal = 0f
+        var cardioSeconds = 0f
+        var timeKcal = 0f
+        var timeSeconds = 0f
+        var strengthReps = 0
+        var strengthSets = 0
 
         exercises.forEach { ex ->
             val isCardioByName = CARDIO_MET.containsKey(ex.name)
@@ -64,30 +73,43 @@ object CalorieCalculator {
                         isCardioByName -> {
                     val met = CARDIO_MET[ex.name] ?: DEFAULT_CARDIO_MET
                     ex.sets.forEach { s ->
-                        var sec = s.seconds ?: 0
+                        var sec = (s.seconds ?: 0).toFloat()
                         // время не введено, но есть дистанция → оценка при ~9 км/ч
-                        if (sec == 0 && (s.distanceKm ?: 0f) > 0f) {
-                            sec = ((s.distanceKm!! / 9f) * 3600f).toInt()
+                        if (sec == 0f && (s.distanceKm ?: 0f) > 0f) {
+                            sec = (s.distanceKm!! / 9f) * 3600f
                         }
-                        kcal += met * weight * (sec / 3600f)
+                        cardioSeconds += sec
+                        cardioKcal += met * weight * (sec / 3600f)
                     }
                 }
                 // ── Статика (удержание по времени) ────────────────────
                 ex.measureType == MeasureType.TIME -> {
                     ex.sets.forEach { s ->
-                        kcal += ISOMETRIC_MET * weight * ((s.seconds ?: 0) / 3600f)
+                        val sec = (s.seconds ?: 0).toFloat()
+                        timeSeconds += sec
+                        timeKcal += ISOMETRIC_MET * weight * (sec / 3600f)
                     }
                 }
                 // ── Силовые и «только повторы» ────────────────────────
                 else -> {
                     ex.sets.forEach { s ->
-                        val activeSec = s.reps * SECONDS_PER_REP
-                        kcal += STRENGTH_MET * weight * (activeSec / 3600f)
+                        strengthReps += s.reps
+                        strengthSets += 1
                     }
                 }
             }
         }
 
-        return kcal.roundToInt()
+        // Активное силовое время: по повторам, но не меньше ~30 сек на подход
+        val strengthActiveSeconds = maxOf(strengthReps * SECONDS_PER_REP, strengthSets * MIN_SECONDS_PER_SET)
+        val strengthKcal = STRENGTH_ACTIVE_MET * weight * (strengthActiveSeconds / 3600f)
+
+        // Отдых = общая длительность минус всё активное время (кардио+статика+силовое)
+        val totalSeconds = durationMinutes * 60f
+        val activeSeconds = cardioSeconds + timeSeconds + strengthActiveSeconds
+        val restSeconds = (totalSeconds - activeSeconds).coerceAtLeast(0f)
+        val restKcal = REST_MET * weight * (restSeconds / 3600f)
+
+        return (cardioKcal + timeKcal + strengthKcal + restKcal).roundToInt()
     }
 }

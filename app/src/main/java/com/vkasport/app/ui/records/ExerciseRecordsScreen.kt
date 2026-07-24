@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.model.ExerciseHistory
 import com.vkasport.app.data.model.ExerciseLibrary
 import com.vkasport.app.data.model.MeasureType
+import com.vkasport.app.data.model.ProgressionAdvisor
 import com.vkasport.app.ui.common.SetFormat
 import com.vkasport.app.ui.common.SimpleLineChart
 import java.time.LocalDate
@@ -73,6 +76,8 @@ fun ExerciseRecordsScreen(
 ) {
     val records by viewModel.exerciseHistory.collectAsState()
     val completedWorkouts by viewModel.completedWorkouts.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+    LaunchedEffect(Unit) { viewModel.loadUserProfile() }
 
     // Рекорд, по которому открыт bottom sheet с графиками прогресса
     var detailRecord by remember { mutableStateOf<ExerciseHistory?>(null) }
@@ -145,6 +150,7 @@ fun ExerciseRecordsScreen(
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 28.dp)
             ) {
@@ -194,6 +200,50 @@ fun ExerciseRecordsScreen(
                             startLabel = volumePoints.firstOrNull()?.first?.format(chartDateFmt),
                             endLabel = volumePoints.lastOrNull()?.first?.format(chartDateFmt)
                         )
+                    }
+
+                    // ===== РЕКОМЕНДАЦИЯ ПО ПРОГРЕССИИ (п4) =====
+                    Spacer(Modifier.height(12.dp))
+                    val bodyWeight = userProfile?.weightKg
+                        ?: completedWorkouts.firstOrNull()?.athleteWeight
+                    // последний рабочий подход (макс. вес в самой свежей тренировке с этим упражнением)
+                    val lastTopSet = completedWorkouts
+                        .firstOrNull { w -> w.exercises.any { it.name == rec.exerciseName } }
+                        ?.exercises?.filter { it.name == rec.exerciseName }?.flatMap { it.sets }
+                        ?.maxByOrNull { it.weight }
+                    val advice = ProgressionAdvisor.advise(
+                        name = rec.exerciseName,
+                        history = rec,
+                        lastTopSet = lastTopSet,
+                        recentMainPoints = mainPoints.map { it.second },
+                        bodyWeight = bodyWeight
+                    )
+                    Column(
+                        Modifier.fillMaxWidth().background(Black, RoundedCornerShape(16.dp)).padding(14.dp)
+                    ) {
+                        Text("РЕКОМЕНДАЦИЯ", color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(advice.nextTarget, color = Gold, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(6.dp))
+                        Text(advice.trendLine, color = White.copy(alpha = 0.85f), fontSize = 12.sp)
+                        advice.levelLine?.let {
+                            Spacer(Modifier.height(4.dp))
+                            Text(it, color = White.copy(alpha = 0.85f), fontSize = 12.sp, lineHeight = 16.sp)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text("Как прогрессировать", color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(advice.method, color = White.copy(alpha = 0.85f), fontSize = 12.sp, lineHeight = 17.sp)
+                        Spacer(Modifier.height(10.dp))
+                        Text("Техника", color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        advice.technique.forEach { tip ->
+                            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text("•", color = Gold, fontSize = 12.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(tip, color = White, fontSize = 12.sp, lineHeight = 17.sp)
+                            }
+                        }
                     }
                 }
             }

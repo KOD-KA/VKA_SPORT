@@ -26,4 +26,9 @@ interface ExerciseHistoryDao {
     suspend fun getAll():
             List<ExerciseHistoryEntity>
 
+    // exerciseName — первичный ключ; переименование безопасно, если нового
+    // имени ещё нет в таблице (проверка коллизии — на стороне ViewModel)
+    @Query("UPDATE exercise_history SET exerciseName = :newName WHERE exerciseName = :oldName")
+    suspend fun renameExercise(oldName: String, newName: String)
+
 }

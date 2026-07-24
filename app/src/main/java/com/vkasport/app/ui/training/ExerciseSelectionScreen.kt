@@ -39,8 +39,11 @@ fun ExerciseSelectionScreen(
     onBack: () -> Unit,
     onRepeatLastGroup: () -> Unit,
     onAddCustomExercise: (String, MeasureType) -> Unit,
+    onRenameCustom: (String, String) -> Unit = { _, _ -> },
     onExerciseSelected: (String) -> Unit
 ) {
+    // п8: имя своего упражнения, которое сейчас переименовывают
+    var renamingName by remember { mutableStateOf<String?>(null) }
     val libraryExercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
     var addingCustom by remember(muscleGroup) { mutableStateOf(false) }
     var customText by remember(muscleGroup) { mutableStateOf("") }
@@ -146,11 +149,17 @@ fun ExerciseSelectionScreen(
                 }
                 items(customExercises) { name ->
                     val isAdded = name in alreadyAdded
-                    ExerciseListItem(name = name, isAdded = isAdded, isCustom = true) {
+                    ExerciseListItem(
+                        name = name, isAdded = isAdded, isCustom = true,
+                        onRename = { renamingName = name }
+                    ) {
                         onExerciseSelected(name)
                     }
                 }
             }
+
+            // ── Переименование своего упражнения (п8) ────────────────
+            // (диалог рендерится ниже, вне списка)
 
             // ── Добавить своё упражнение ─────────────────────────────
             item {
@@ -274,6 +283,29 @@ fun ExerciseSelectionScreen(
             }
         }
     }
+
+    // ── ДИАЛОГ ПЕРЕИМЕНОВАНИЯ СВОЕГО УПРАЖНЕНИЯ (п8) ──
+    renamingName?.let { oldName ->
+        var newName by remember(oldName) { mutableStateOf(oldName) }
+        AlertDialog(
+            onDismissRequest = { renamingName = null },
+            title = { Text("Переименовать упражнение") },
+            text = {
+                OutlinedTextField(
+                    value = newName, onValueChange = { newName = it },
+                    label = { Text("Новое название") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRenameCustom(oldName, newName)
+                    renamingName = null
+                }) { Text("Сохранить") }
+            },
+            dismissButton = { TextButton(onClick = { renamingName = null }) { Text("Отмена") } }
+        )
+    }
 }
 
 @Composable
@@ -281,6 +313,7 @@ private fun ExerciseListItem(
     name: String,
     isAdded: Boolean,
     isCustom: Boolean,
+    onRename: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -300,7 +333,19 @@ private fun ExerciseListItem(
             }
         }
 
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(8.dp))
+
+        // п8: карандаш для переименования своего упражнения
+        if (onRename != null) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(SoftGray, RoundedCornerShape(8.dp))
+                    .clickable { onRename() },
+                contentAlignment = Alignment.Center
+            ) { Text("✎", color = DarkGray, fontSize = 14.sp) }
+            Spacer(Modifier.width(8.dp))
+        }
 
         if (isAdded) {
             Box(

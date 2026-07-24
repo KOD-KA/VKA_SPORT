@@ -172,6 +172,11 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                         viewModel.addExercise(ex)
                         viewModel.setCurrentScreen("training")
                     },
+                    onRenameCustom = { oldName, newName ->
+                        viewModel.renameCustomExercise(g, oldName, newName) { _, msg ->
+                            android.widget.Toast.makeText(notifContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     onAddCustomExercise = { name, measureType ->
                         viewModel.addCustomExercise(name, g, measureType)
                         // Передаём тип явно: своё упражнение могло ещё не

@@ -29,4 +29,7 @@ interface PlannedWorkoutDao {
 
     @Query("DELETE FROM planned_exercises WHERE workoutId = :workoutId")
     suspend fun deleteExercisesByWorkout(workoutId: Long)
+
+    @Query("UPDATE planned_exercises SET exerciseName = :newName WHERE exerciseName = :oldName")
+    suspend fun renameExercise(oldName: String, newName: String)
 }

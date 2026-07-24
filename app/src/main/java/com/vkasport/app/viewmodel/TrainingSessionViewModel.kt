@@ -656,6 +656,38 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         }
     }
 
+    /**
+     * Переименование своего упражнения (п8). Обновляет не только строку в
+     * custom_exercises, но и ВСЮ историю (архив, подходы, рекорды, планы),
+     * чтобы рекорды и статистика не отвязались от упражнения.
+     */
+    fun renameCustomExercise(
+        group: MuscleGroup, oldName: String, newName: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) { onResult(false, "Название не может быть пустым"); return }
+        if (trimmed.equals(oldName, ignoreCase = true)) { onResult(false, "Название не изменилось"); return }
+        val target = _customExercises.value.find { it.muscleGroup == group && it.name == oldName }
+        if (target == null) { onResult(false, "Упражнение не найдено"); return }
+        val collision = ExerciseLibrary.exercises.any { it.name.equals(trimmed, ignoreCase = true) } ||
+                _customExercises.value.any { it.name.equals(trimmed, ignoreCase = true) }
+        if (collision) { onResult(false, "Такое упражнение уже есть"); return }
+
+        viewModelScope.launch {
+            database.customExerciseDao().rename(target.id, trimmed)
+            database.completedWorkoutExerciseDao().renameExercise(oldName, trimmed)
+            database.completedWorkoutSetDao().renameExercise(oldName, trimmed)
+            database.exerciseHistoryDao().renameExercise(oldName, trimmed)
+            database.plannedWorkoutDao().renameExercise(oldName, trimmed)
+            loadCustomExercises()
+            loadArchiveFromDatabase()
+            loadRecordsFromDatabase()
+            loadPlannedWorkouts()
+            onResult(true, "Переименовано")
+        }
+    }
+
     fun addCustomExercise(name: String, group: MuscleGroup, measureType: MeasureType = MeasureType.WEIGHT_REPS) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
