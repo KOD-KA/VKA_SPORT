@@ -32,9 +32,7 @@ val Gold =
 val TrainingBg =
     Color(0xFFF0F0F3)
 
-
 // LIGHT THEME
-
 
 // ИСПРАВЛЕНО: раньше BackgroundLight = SoftGray — тот же цвет, что и у
 // самих карточек (см. RecordCard/ArchiveCard), из-за чего карточки
