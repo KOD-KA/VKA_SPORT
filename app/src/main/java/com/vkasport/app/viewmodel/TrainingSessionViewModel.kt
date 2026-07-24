@@ -814,15 +814,28 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
      * Несколько значений за один день усредняются. Отсортировано по дате.
      */
     fun getWeightHistory(): List<Pair<LocalDate, Float>> {
+        // ИСПРАВЛЕНО: за один день берём ПОСЛЕДНЮЮ запись, а не среднее.
+        // Раньше вес 91.2 из тренировки и 93.0 из профиля за один день
+        // усреднялись в 92.1 — пользователь видел число, которого не вводил.
+        // Приоритет внутри дня: запись журнала тела/профиля (свежий id)
+        // важнее веса, введённого на старте тренировки.
+        data class Entry(val date: LocalDate, val weight: Float, val rank: Long)
+
         val fromWorkouts = _completedWorkouts.value.mapNotNull { w ->
-            w.athleteWeight?.let { w.dateTime.toLocalDate() to it }
+            w.athleteWeight?.let {
+                // ранг по времени тренировки (в пределах суток)
+                Entry(w.dateTime.toLocalDate(), it, w.dateTime.toLocalTime().toSecondOfDay().toLong())
+            }
         }
         val fromMetrics = _bodyMetrics.value.mapNotNull { m ->
-            m.weight?.let { LocalDate.ofEpochDay(m.date) to it }
+            m.weight?.let {
+                // ручные записи всегда «позже» тренировочных за тот же день
+                Entry(LocalDate.ofEpochDay(m.date), it, 1_000_000L + m.id)
+            }
         }
         return (fromWorkouts + fromMetrics)
-            .groupBy { it.first }
-            .map { (d, list) -> d to (list.map { it.second }.average().toFloat()) }
+            .groupBy { it.date }
+            .mapNotNull { (d, list) -> list.maxByOrNull { it.rank }?.let { d to it.weight } }
             .sortedBy { it.first }
     }
 

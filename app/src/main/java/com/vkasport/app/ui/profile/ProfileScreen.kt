@@ -91,6 +91,12 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     // Вес для ИМТ и сравнения: САМАЯ СВЕЖАЯ запись (тренировки + журнал тела),
     // а если истории нет — значение из профиля
     val effectiveWeight = currentWeight ?: userProfile?.weightKg
+    // Средний вес за последние 4 записи (тренировки + журнал) — сглаживает
+    // суточные колебания, по нему удобнее судить о реальной динамике
+    val avgRecentWeight = weightHistory.takeLast(4)
+        .map { it.second }
+        .takeIf { it.isNotEmpty() }
+        ?.average()?.toFloat()
     val profileHeight = userProfile?.heightCm
     val bmi = if (profileHeight != null && profileHeight > 0f && effectiveWeight != null)
         effectiveWeight / ((profileHeight / 100f) * (profileHeight / 100f)) else null
@@ -207,15 +213,12 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                // Вес отсюда убран — он показан в карточке «вес, кг» ниже
-                // (раньше числа могли расходиться и это путало)
+                // Только имя: вес и рост показаны в карточках ниже,
+                // дублировать их здесь не нужно
                 Text(
                     userProfile?.name?.takeIf { it.isNotBlank() } ?: "Ваше имя",
                     color = Black, fontSize = 22.sp, fontWeight = FontWeight.Bold
                 )
-                profileHeight?.let {
-                    Text("Рост: ${it.toInt()} см", color = DarkGray, fontSize = 13.sp)
-                }
             }
             Text(
                 "Изменить", color = DarkGray, fontSize = 12.sp, fontWeight = FontWeight.Medium,
@@ -286,10 +289,20 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                 .padding(14.dp)
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("ВЕС, КГ", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Column {
+                    Text("ВЕС, КГ", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    avgRecentWeight?.let {
+                        Text(
+                            "средний за %d записи: %.1f кг".format(
+                                minOf(4, weightHistory.size), it
+                            ),
+                            color = DarkGray, fontSize = 11.sp
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 currentWeight?.let {
-                    Text("%.1f".format(it), color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("%.1f".format(it), color = Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(Modifier.height(8.dp))
