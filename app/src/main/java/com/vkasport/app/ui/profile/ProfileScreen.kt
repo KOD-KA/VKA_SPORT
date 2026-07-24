@@ -74,7 +74,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
         viewModel.loadRecordsFromDatabase()
     }
 
-    // workouts отсортирован DESC (новые первые) → самая ПЕРВАЯ тренировка
+    // Workouts отсортирован DESC (новые первые) → самая ПЕРВАЯ тренировка
     // в жизни — это ПОСЛЕДНИЙ элемент списка. Здесь lastOrNull() корректен.
     val firstWorkoutDate = workouts.lastOrNull()?.dateTime?.toLocalDate()
     val daysSinceStart = firstWorkoutDate?.let {
@@ -495,7 +495,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                 .background(Black, RoundedCornerShape(16.dp))
                 .clickable {
                     // Открываем страницу поддержки во внешнем браузере/приложении.
-                    // try/catch на случай, если на устройстве нет браузера.
+                    // Try/catch на случай, если на устройстве нет браузера.
                     try {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse(DONATION_URL))
