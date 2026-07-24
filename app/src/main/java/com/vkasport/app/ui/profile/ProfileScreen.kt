@@ -11,6 +11,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -61,7 +64,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     val context = LocalContext.current
     val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yy") }
 
-    LaunchedEffect(Unit) { viewModel.loadBodyMetrics() }
+    LaunchedEffect(Unit) { viewModel.loadBodyMetrics(); viewModel.loadUserProfile() }
 
     // workouts отсортирован DESC (новые первые) → самая ПЕРВАЯ тренировка
     // в жизни — это ПОСЛЕДНИЙ элемент списка. Здесь lastOrNull() корректен.
@@ -76,6 +79,12 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
 
     val weightHistory = remember(workouts, bodyMetrics) { viewModel.getWeightHistory() }
     val currentWeight = weightHistory.lastOrNull()?.second
+    val userProfile by viewModel.userProfile.collectAsState()
+    // Вес для ИМТ и сравнения: ручной из профиля приоритетнее авто-веса
+    val effectiveWeight = userProfile?.weightKg ?: currentWeight
+    val profileHeight = userProfile?.heightCm
+    val bmi = if (profileHeight != null && profileHeight > 0f && effectiveWeight != null)
+        effectiveWeight / ((profileHeight / 100f) * (profileHeight / 100f)) else null
 
     // ===== ЛАУНЧЕРЫ БЭКАПА (SAF) =====
     val exportLauncher = rememberLauncherForActivityResult(
@@ -129,6 +138,32 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
         )
     }
 
+    // ===== ФОТО ПРОФИЛЯ + РЕДАКТИРОВАНИЕ (п1, п2) =====
+    var showProfileDialog by remember { mutableStateOf(false) }
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            val path = copyProfilePhoto(context, it)
+            if (path != null) {
+                viewModel.saveUserProfile(userProfile?.name, path, userProfile?.heightCm, userProfile?.weightKg)
+                Toast.makeText(context, "Фото обновлено", Toast.LENGTH_SHORT).show()
+            } else Toast.makeText(context, "Не удалось загрузить фото", Toast.LENGTH_SHORT).show()
+        }
+    }
+    if (showProfileDialog) {
+        ProfileEditDialog(
+            initialName = userProfile?.name ?: "",
+            initialHeight = userProfile?.heightCm,
+            initialWeight = userProfile?.weightKg,
+            onDismiss = { showProfileDialog = false },
+            onSave = { name, h, w ->
+                viewModel.saveUserProfile(name.ifBlank { null }, userProfile?.photoPath, h, w)
+                showProfileDialog = false
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -139,32 +174,53 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
 
         Spacer(Modifier.height(16.dp))
 
-        // ===== ШАПКА =====
+        // ===== ШАПКА: фото + имя (п1) =====
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .background(Black, CircleShape),
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Black, CircleShape)
+                    .clickable { photoLauncher.launch(arrayOf("image/*")) },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Профиль",
-                    tint = White,
-                    modifier = Modifier.size(30.dp)
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text("ПРОФИЛЬ", color = Black, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                currentWeight?.let {
-                    Text(
-                        "Текущий вес: %.1f кг".format(it),
-                        color = DarkGray,
-                        fontSize = 13.sp
+                val photo = userProfile?.photoPath
+                if (photo != null) {
+                    AsyncImage(
+                        model = java.io.File(photo),
+                        contentDescription = "Фото профиля",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
                     )
+                } else {
+                    Icon(Icons.Default.Person, "Профиль", tint = White, modifier = Modifier.size(34.dp))
                 }
             }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    userProfile?.name?.takeIf { it.isNotBlank() } ?: "Ваше имя",
+                    color = Black, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                )
+                currentWeight?.let {
+                    Text("Текущий вес: %.1f кг".format(it), color = DarkGray, fontSize = 13.sp)
+                }
+            }
+            Text(
+                "Изменить", color = DarkGray, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable { showProfileDialog = true }.padding(8.dp)
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // ===== ФИЗИЧЕСКИЕ ДАННЫЕ: рост / вес / ИМТ (п2) =====
+        Row(Modifier.fillMaxWidth()) {
+            StatCard(profileHeight?.let { "${it.toInt()}" } ?: "—", "рост, см", Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            StatCard(effectiveWeight?.let { "%.1f".format(it) } ?: "—", "вес, кг", Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            StatCard(bmi?.let { "%.1f".format(it) } ?: "—", bmiCategory(bmi), Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(20.dp))
@@ -357,7 +413,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
         )
         Spacer(Modifier.height(10.dp))
 
-        if (currentWeight == null) {
+        if (effectiveWeight == null) {
             Text(
                 "Введите свой вес (на старте тренировки или в журнале тела), " +
                         "чтобы увидеть сравнение",
@@ -369,7 +425,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                 val rec = records[std.exerciseName] ?: return@forEach
                 if (rec.maxWeight <= 0f) return@forEach
                 shownAny = true
-                StandardCard(std, rec.maxWeight, rec.maxWeightReps, currentWeight)
+                StandardCard(std, rec.maxWeight, rec.maxWeightReps, effectiveWeight)
                 Spacer(Modifier.height(10.dp))
             }
             if (!shownAny) {
@@ -675,3 +731,76 @@ private fun StandardCard(
 // необходимости — единственное место, где задаётся адрес.
 private const val DONATION_URL =
     "https://boosty.to/rstrtrt1/purchase/4022729?ssource=DIRECT&share=subscription_link"
+// ===== ИМТ, копирование фото, диалог профиля (п1, п2) =====
+
+private fun bmiCategory(bmi: Float?): String = when {
+    bmi == null   -> "ИМТ"
+    bmi < 18.5f   -> "ИМТ · дефицит"
+    bmi < 25f     -> "ИМТ · норма"
+    bmi < 30f     -> "ИМТ · избыток"
+    else          -> "ИМТ · ожирение"
+}
+
+/** Копирует выбранное фото во внутреннюю память приложения, возвращает путь. */
+private fun copyProfilePhoto(context: android.content.Context, uri: Uri): String? {
+    return try {
+        val file = java.io.File(context.filesDir, "profile_photo_${System.currentTimeMillis()}.jpg")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        }
+        file.absolutePath
+    } catch (e: Exception) {
+        null
+    }
+}
+
+@Composable
+private fun ProfileEditDialog(
+    initialName: String,
+    initialHeight: Float?,
+    initialWeight: Float?,
+    onDismiss: () -> Unit,
+    onSave: (String, Float?, Float?) -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var height by remember { mutableStateOf(initialHeight?.let { it.toInt().toString() } ?: "") }
+    var weight by remember { mutableStateOf(initialWeight?.let { "%.1f".format(it) } ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Профиль") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it },
+                    label = { Text("Имя") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = height, onValueChange = { height = it },
+                    label = { Text("Рост, см") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = weight, onValueChange = { weight = it },
+                    label = { Text("Вес, кг") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(
+                    name.trim(),
+                    height.toIntOrNull()?.toFloat(),
+                    weight.replace(",", ".").toFloatOrNull()
+                )
+            }) { Text("СОХРАНИТЬ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}

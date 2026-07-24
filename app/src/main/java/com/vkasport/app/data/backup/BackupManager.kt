@@ -9,6 +9,7 @@ import com.vkasport.app.data.local.entity.ExerciseHistoryEntity
 import com.vkasport.app.data.local.entity.PlannedExerciseEntity
 import com.vkasport.app.data.local.entity.PlannedWorkoutEntity
 import com.vkasport.app.data.local.entity.BodyMetricEntity
+import com.vkasport.app.data.local.entity.UserProfileEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -19,6 +20,7 @@ import org.json.JSONObject
  *
  * ПРАВИЛА ВЕРСИОНИРОВАНИЯ ФОРМАТА:
  *  - formatVersion 1: исходный формат (вес × повторы)
+ *  - formatVersion 4: + профиль (имя, рост, вес; фото не переносится)
  *  - formatVersion 3: + журнал тела (bodyMetrics)
  *  - formatVersion 2: + measureType у упражнений/своих упражнений,
  *    + seconds/distanceKm/load/speed у подходов,
@@ -29,7 +31,7 @@ import org.json.JSONObject
  */
 object BackupManager {
 
-    const val FORMAT_VERSION = 3
+    const val FORMAT_VERSION = 4
 
     // Идентификатор приложения в файле бэкапа. STYRK — текущий, VKA_SPORT —
     // историческое имя до ребрендинга (импорт принимает оба).
@@ -147,6 +149,15 @@ object BackupManager {
         }
         root.put("bodyMetrics", bodyArr)
 
+        // --- профиль (без фото — путь привязан к устройству) ---
+        db.userProfileDao().get()?.let { p ->
+            val pObj = JSONObject()
+            p.name?.let { pObj.put("name", it) }
+            p.heightCm?.let { pObj.put("heightCm", it.toDouble()) }
+            p.weightKg?.let { pObj.put("weightKg", it.toDouble()) }
+            root.put("profile", pObj)
+        }
+
         root.toString(2)
     }
 
@@ -170,6 +181,7 @@ object BackupManager {
             1 -> importV1(db, root)
             2 -> importV2(db, root)
             3 -> importV3(db, root)
+            4 -> importV4(db, root)
             else -> throw IllegalArgumentException(
                 "Бэкап формата версии $v — эта версия приложения его не знает. Обновите приложение."
             )
@@ -181,6 +193,22 @@ object BackupManager {
      * v2-часть переиспользуется напрямую — она читает только известные ей
      * поля, а bodyMetrics докидываем отдельно (clearAllTables уже внутри).
      */
+    /** Парсер формата v4 (текущий): всё из v3 + профиль пользователя. */
+    private suspend fun importV4(db: WorkoutDatabase, root: JSONObject) {
+        importV3(db, root)
+        root.optJSONObject("profile")?.let { p ->
+            db.userProfileDao().upsert(
+                UserProfileEntity(
+                    id = 1,
+                    name = if (p.has("name")) p.getString("name") else null,
+                    photoPath = null,
+                    heightCm = if (p.has("heightCm")) p.getDouble("heightCm").toFloat() else null,
+                    weightKg = if (p.has("weightKg")) p.getDouble("weightKg").toFloat() else null
+                )
+            )
+        }
+    }
+
     private suspend fun importV3(db: WorkoutDatabase, root: JSONObject) {
         importV2(db, root)
 

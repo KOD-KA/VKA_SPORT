@@ -42,6 +42,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // ЖУРНАЛ ТЕЛА (этап «тело»): записи веса и замеров, отсортированы по
     // дате ПО ВОЗРАСТАНИЮ (старые первые — так удобнее строить графики)
     private val _bodyMetrics = MutableStateFlow<List<BodyMetricEntity>>(emptyList())
+    private val _userProfile = MutableStateFlow<UserProfileEntity?>(null)
 
     val state: StateFlow<CurrentWorkoutState>     = _state
     val completedWorkouts = _completedWorkouts.asStateFlow()
@@ -55,6 +56,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     private val _navigateToTraining = MutableStateFlow(0)
     val navigateToTraining = _navigateToTraining.asStateFlow()
     val bodyMetrics = _bodyMetrics.asStateFlow()
+    val userProfile = _userProfile.asStateFlow()
 
     // ВАЖНЫЙ ИНВАРИАНТ: _completedWorkouts ВСЕГДА отсортирован по dateTime
     // по убыванию — [0] самая свежая тренировка, последняя — самая старая.
@@ -734,6 +736,22 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         viewModelScope.launch { _bodyMetrics.value = database.bodyMetricDao().getAll() }
     }
 
+    // ==================== ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ ====================
+
+    fun loadUserProfile() {
+        viewModelScope.launch { _userProfile.value = database.userProfileDao().get() }
+    }
+
+    fun saveUserProfile(name: String?, photoPath: String?, heightCm: Float?, weightKg: Float?) {
+        viewModelScope.launch {
+            database.userProfileDao().upsert(
+                UserProfileEntity(id = 1, name = name, photoPath = photoPath,
+                    heightCm = heightCm, weightKg = weightKg)
+            )
+            loadUserProfile()
+        }
+    }
+
     fun addBodyMetric(entity: BodyMetricEntity) {
         viewModelScope.launch {
             database.bodyMetricDao().insert(entity)
@@ -806,6 +824,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 loadCustomExercises()
                 loadPlannedWorkouts()
                 loadBodyMetrics()
+                loadUserProfile()
 
                 onResult(true, "Данные восстановлены")
             } catch (e: IllegalArgumentException) {

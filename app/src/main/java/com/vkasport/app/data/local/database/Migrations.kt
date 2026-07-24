@@ -66,8 +66,27 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+/**
+ * 16 -> 17: таблица user_profile (имя, фото, рост, вес). Одна строка (id=1).
+ * SQL точно соответствует схеме UserProfileEntity (Int PK без autogenerate).
+ */
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `user_profile` (" +
+                    "`id` INTEGER NOT NULL, " +
+                    "`name` TEXT, " +
+                    "`photoPath` TEXT, " +
+                    "`heightCm` REAL, " +
+                    "`weightKg` REAL, " +
+                    "PRIMARY KEY(`id`))"
+        )
+    }
+}
+
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_14_15,
-    MIGRATION_15_16
-    // сюда добавлять будущие миграции: MIGRATION_16_17, ...
+    MIGRATION_15_16,
+    MIGRATION_16_17
+    // сюда добавлять будущие миграции: MIGRATION_17_18, ...
 )
