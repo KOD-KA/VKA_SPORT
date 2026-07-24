@@ -2,6 +2,7 @@ package com.vkasport.app.ui.profile
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -498,9 +499,9 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                     // Try/catch на случай, если на устройстве нет браузера.
                     try {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(DONATION_URL))
+                            Intent(Intent.ACTION_VIEW, DONATION_URL.toUri())
                         )
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -528,7 +529,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
         val versionName = remember {
             try {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }
@@ -773,7 +774,7 @@ private fun copyProfilePhoto(context: android.content.Context, uri: Uri): String
             file.outputStream().use { output -> input.copyTo(output) }
         }
         file.absolutePath
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }
@@ -787,7 +788,7 @@ private fun ProfileEditDialog(
     onSave: (String, Float?, Float?) -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
-    var height by remember { mutableStateOf(initialHeight?.let { it.toInt().toString() } ?: "") }
+    var height by remember { mutableStateOf(initialHeight?.toInt()?.toString() ?: "") }
     var weight by remember { mutableStateOf(initialWeight?.let { "%.1f".format(it) } ?: "") }
 
     AlertDialog(

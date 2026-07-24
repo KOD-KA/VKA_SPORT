@@ -1,12 +1,10 @@
 package com.vkasport.app
 
 import android.app.Application
-import android.os.Build
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.gif.AnimatedImageDecoder
-import coil3.gif.GifDecoder
 
 /**
  * Класс приложения. Нужен, чтобы включить декодер анимированных GIF в Coil
@@ -18,11 +16,9 @@ class StyrkApp : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)
             .components {
-                if (Build.VERSION.SDK_INT >= 28) {
-                    add(AnimatedImageDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
-                }
+                // minSdk = 29, поэтому системный декодер анимации доступен
+                // всегда (GifDecoder для API < 28 не нужен)
+                add(AnimatedImageDecoder.Factory())
             }
             .build()
     }

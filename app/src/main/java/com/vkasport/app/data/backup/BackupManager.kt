@@ -166,7 +166,7 @@ object BackupManager {
     suspend fun importJson(db: WorkoutDatabase, json: String) = withContext(Dispatchers.IO) {
         val root = try {
             JSONObject(json)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             throw IllegalArgumentException("Файл не является бэкапом STYRK")
         }
 

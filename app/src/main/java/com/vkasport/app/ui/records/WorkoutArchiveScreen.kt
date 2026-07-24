@@ -337,7 +337,7 @@ private fun WorkoutDetailSheet(
     onDeleted: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    val dateFmt = DateTimeFormatter.ofPattern("dd MMMM yyyy", java.util.Locale("ru"))
+    val dateFmt = DateTimeFormatter.ofPattern("dd MMMM yyyy", java.util.Locale.forLanguageTag("ru"))
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
     val totalSets   = workout.exercises.sumOf { it.sets.size }
     val totalVolume = workout.exercises.sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }.toInt()

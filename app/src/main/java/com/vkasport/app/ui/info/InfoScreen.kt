@@ -558,7 +558,7 @@ private fun QuickPlanSheet(
             items(next14Days.size) { i ->
                 val date = next14Days[i]
                 val sel = date == selDate
-                val dayName = date.dayOfWeek.getDisplayName(JTextStyle.SHORT, Locale("ru")).replaceFirstChar { it.uppercase() }
+                val dayName = date.dayOfWeek.getDisplayName(JTextStyle.SHORT, Locale.forLanguageTag("ru")).replaceFirstChar { it.uppercase() }
                 Box(
                     modifier = Modifier.width(52.dp).height(56.dp)
                         .background(if (sel) DarkGray else SoftGray, RoundedCornerShape(10.dp))

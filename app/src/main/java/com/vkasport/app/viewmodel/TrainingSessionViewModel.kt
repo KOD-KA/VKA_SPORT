@@ -49,7 +49,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     val exerciseHistory   = _exerciseHistory.asStateFlow()
     val plannedWorkouts   = _plannedWorkouts.asStateFlow()
     val customExercises   = _customExercises.asStateFlow()
-    val lastCompletedWorkoutId = _lastCompletedWorkoutId.asStateFlow()
     val restTimerStart = _restTimerStart.asStateFlow()
 
     // Сигнал MainScreen'у переключиться на вкладку тренировки (счётчик-триггер)
@@ -162,7 +161,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                 list.add(WorkoutExercise(name = name, muscleGroup = group, sets = sets, measureType = measureType))
             }
             list
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -257,9 +256,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     // Старый вариант (вес×повторы) — делегирует общему, сохранён для
     // совместимости вызовов
-    fun addSetToExercise(exerciseId: String, weight: Float, reps: Int) =
-        addSetToExercise(exerciseId, WorkoutSet(weight, reps))
-
     // МОДЕЛЬ V2: добавить подход ЛЮБОГО типа конкретному экземпляру (по id)
     fun addSetToExercise(exerciseId: String, set: WorkoutSet) {
         val target = _state.value.selectedExercises.find { it.id == exerciseId } ?: return
@@ -275,9 +271,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     // Редактирование уже введённого подхода — тоже по id экземпляра,
     // чтобы при дублях правился только тот конкретный подход в той
     // конкретной карточке, по которой тапнули
-    fun updateSet(exerciseId: String, index: Int, weight: Float, reps: Int) =
-        updateSet(exerciseId, index, WorkoutSet(weight, reps))
-
     // МОДЕЛЬ V2: редактирование подхода любого типа
     fun updateSet(exerciseId: String, index: Int, set: WorkoutSet) {
         val updated = _state.value.selectedExercises.map { ex ->
@@ -717,14 +710,6 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         // интервалы. Раньше тренировка "вчера вечером" (10 ч назад) через
         // Duration.toDays() давала 0 → показывало "тренировался сегодня".
         return ChronoUnit.DAYS.between(w.first().dateTime.toLocalDate(), LocalDate.now())
-    }
-    fun getWeightDifference(): Float? {
-        val w = _completedWorkouts.value; if (w.size < 2) return null
-        return (w[0].athleteWeight ?: return null) - (w[1].athleteWeight ?: return null)
-    }
-    fun isExerciseRecord(name: String, weight: Float, reps: Int): Boolean {
-        val r = _exerciseHistory.value[name] ?: return false
-        return weight >= r.maxWeight && reps >= r.maxWeightReps
     }
 
     /**

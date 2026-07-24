@@ -43,8 +43,6 @@ import com.vkasport.app.data.local.entity.*
 )
 abstract class WorkoutDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
-    abstract fun exerciseDao(): ExerciseDao
-    abstract fun exerciseSetDao(): ExerciseSetDao
     abstract fun workoutHistoryDao(): WorkoutHistoryDao
     abstract fun exerciseHistoryDao(): ExerciseHistoryDao
     abstract fun completedWorkoutExerciseDao(): CompletedWorkoutExerciseDao

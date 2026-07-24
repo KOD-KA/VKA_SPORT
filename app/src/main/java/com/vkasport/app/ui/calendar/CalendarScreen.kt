@@ -134,7 +134,7 @@ private fun MonthTab(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 NavCircle("<") { yearMonth = yearMonth.minusMonths(1) }
-                val name = yearMonth.month.getDisplayName(JTextStyle.FULL_STANDALONE, Locale("ru")).replaceFirstChar { it.uppercase() }
+                val name = yearMonth.month.getDisplayName(JTextStyle.FULL_STANDALONE, Locale.forLanguageTag("ru")).replaceFirstChar { it.uppercase() }
                 Text("$name ${yearMonth.year}", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 NavCircle(">") { yearMonth = yearMonth.plusMonths(1) }
             }
@@ -280,7 +280,7 @@ private fun WeekTab(
     LaunchedEffect(weekStart) { selectedDate = null }
 
     val weekEnd = weekStart.plusDays(6)
-    val fmtShort = DateTimeFormatter.ofPattern("d MMM", Locale("ru"))
+    val fmtShort = DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("ru"))
     val weekLabel = "${weekStart.format(fmtShort)} — ${weekEnd.format(fmtShort)}"
 
     val selDayPlanned = selectedDate?.let { plannedByDate[it] } ?: emptyList()
@@ -391,7 +391,7 @@ private fun PlannedWorkoutCard(planned: PlannedWorkout, onStart: () -> Unit, onD
                 verticalAlignment = Alignment.CenterVertically) {
                 Text(planned.muscleGroup, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                     modifier = Modifier.weight(1f))
-                val dayName = planned.date.dayOfWeek.getDisplayName(JTextStyle.SHORT, Locale("ru")).replaceFirstChar { it.uppercase() }
+                val dayName = planned.date.dayOfWeek.getDisplayName(JTextStyle.SHORT, Locale.forLanguageTag("ru")).replaceFirstChar { it.uppercase() }
                 Text("$dayName • %02d:%02d".format(planned.hour, planned.minute), color = White.copy(.75f), fontSize = 13.sp)
             }
         }
@@ -579,7 +579,7 @@ private fun WorkoutDetailSheet(
     onDeleted: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    val dateFmt = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("ru"))
+    val dateFmt = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.forLanguageTag("ru"))
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
     val totalSets   = workout.exercises.sumOf { it.sets.size }
     val totalVolume = workout.exercises.sumOf { ex -> ex.sets.sumOf { (it.weight * it.reps).toDouble() } }.toInt()

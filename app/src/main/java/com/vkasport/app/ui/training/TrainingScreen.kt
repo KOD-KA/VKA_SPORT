@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vkasport.app.data.model.MeasureType
+import kotlin.time.Duration.Companion.seconds
 import com.vkasport.app.data.model.MuscleGroup
 import com.vkasport.app.ui.common.SetFormat
 import com.vkasport.app.data.model.WorkoutExercise
@@ -57,7 +58,7 @@ fun TrainingScreen(
     LaunchedEffect(restTimerStart) {
         while (true) {
             nowMs = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1000)
+            kotlinx.coroutines.delay(1.seconds)
         }
     }
 

@@ -1,7 +1,6 @@
 package com.vkasport.app.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import com.vkasport.app.data.local.entity.PlannedExerciseEntity

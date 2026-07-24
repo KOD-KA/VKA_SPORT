@@ -56,9 +56,6 @@ val TextPrimaryLight =
     Black
 
 
-val CardLight =
-    White
-
 
 
 // DARK THEME
@@ -78,7 +75,3 @@ val PrimaryDark =
 
 val TextPrimaryDark =
     White
-
-
-val CardDark =
-    DarkGray
