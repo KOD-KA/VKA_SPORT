@@ -33,8 +33,14 @@ fun WorkoutSummaryScreen(
     // Калории — по только что завершённой тренировке (она уже в архиве,
     // completedWorkouts DESC → первый элемент)
     val completedWorkouts by viewModel.completedWorkouts.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
+    LaunchedEffect(Unit) { viewModel.loadUserProfile() }
     val kcal = completedWorkouts.firstOrNull()?.let {
-        CalorieCalculator.estimateKcal(it.exercises, it.durationMinutes, it.athleteWeight)
+        CalorieCalculator.estimateKcal(
+            it.exercises, it.durationMinutes,
+            it.athleteWeight ?: userProfile?.weightKg,
+            userProfile?.heightCm
+        )
     }
 
     var notes by remember { mutableStateOf("") }

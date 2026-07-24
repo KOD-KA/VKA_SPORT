@@ -775,11 +775,21 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     }
 
     fun saveUserProfile(name: String?, photoPath: String?, heightCm: Float?, weightKg: Float?) {
+        val prevWeight = _userProfile.value?.weightKg
         viewModelScope.launch {
             database.userProfileDao().upsert(
                 UserProfileEntity(id = 1, name = name, photoPath = photoPath,
                     heightCm = heightCm, weightKg = weightKg)
             )
+            // ИСПРАВЛЕНО: вес из профиля пишем и в журнал тела, иначе он жил
+            // отдельно от графика веса (в шапке было одно число, на графике —
+            // другое). Теперь источник веса один: журнал + тренировки.
+            if (weightKg != null && weightKg != prevWeight) {
+                database.bodyMetricDao().insert(
+                    BodyMetricEntity(date = LocalDate.now().toEpochDay(), weight = weightKg)
+                )
+                loadBodyMetrics()
+            }
             loadUserProfile()
         }
     }

@@ -71,6 +71,8 @@ dependencies {
     // Coil — превью YouTube-видео по URL картинки
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Coil GIF — анимированные гифки упражнений (п5)
+    implementation(libs.coil.gif)
     // WorkManager — напоминания о тренировках (версия уже была в libs.versions.toml)
     implementation(libs.androidx.work.runtime.ktx)
 

@@ -2,6 +2,13 @@ package com.vkasport.app.ui.training
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import coil3.compose.AsyncImage
+import com.vkasport.app.data.model.ExerciseGuide
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -44,6 +51,8 @@ fun ExerciseSelectionScreen(
 ) {
     // п8: имя своего упражнения, которое сейчас переименовывают
     var renamingName by remember { mutableStateOf<String?>(null) }
+    // п5: имя упражнения, для которого открыта увеличенная гифка
+    var gifDialogName by remember { mutableStateOf<String?>(null) }
     val libraryExercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
     var addingCustom by remember(muscleGroup) { mutableStateOf(false) }
     var customText by remember(muscleGroup) { mutableStateOf("") }
@@ -130,7 +139,10 @@ fun ExerciseSelectionScreen(
 
             items(libraryExercises) { exercise ->
                 val isAdded = exercise.name in alreadyAdded
-                ExerciseListItem(name = exercise.name, isAdded = isAdded, isCustom = false) {
+                ExerciseListItem(
+                    name = exercise.name, isAdded = isAdded, isCustom = false,
+                    onOpenGif = { gifDialogName = exercise.name }
+                ) {
                     onExerciseSelected(exercise.name)
                 }
             }
@@ -151,7 +163,8 @@ fun ExerciseSelectionScreen(
                     val isAdded = name in alreadyAdded
                     ExerciseListItem(
                         name = name, isAdded = isAdded, isCustom = true,
-                        onRename = { renamingName = name }
+                        onRename = { renamingName = name },
+                        onOpenGif = { gifDialogName = name }
                     ) {
                         onExerciseSelected(name)
                     }
@@ -306,14 +319,47 @@ fun ExerciseSelectionScreen(
             dismissButton = { TextButton(onClick = { renamingName = null }) { Text("Отмена") } }
         )
     }
+
+    // ── ОКНО С УВЕЛИЧЕННОЙ ГИФКОЙ + ТЕХНИКА (п5) ──
+    gifDialogName?.let { gname ->
+        ExerciseGuide.of(gname)?.let { guide ->
+            AlertDialog(
+                onDismissRequest = { gifDialogName = null },
+                confirmButton = { TextButton(onClick = { gifDialogName = null }) { Text("Закрыть") } },
+                title = { Text(gname, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        AsyncImage(
+                            model = ExerciseGuide.assetUri(guide.gifAsset),
+                            contentDescription = gname,
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("ТЕХНИКА", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        guide.technique.forEach { tip ->
+                            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text("•", color = Gold, fontSize = 13.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(tip, color = Black, fontSize = 13.sp, lineHeight = 18.sp)
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ExerciseListItem(
     name: String,
     isAdded: Boolean,
     isCustom: Boolean,
     onRename: (() -> Unit)? = null,
+    onOpenGif: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -334,6 +380,21 @@ private fun ExerciseListItem(
         }
 
         Spacer(Modifier.width(8.dp))
+
+        // п5: превью-гифка рядом с кнопкой; тап/долгое нажатие — увеличить
+        val guide = ExerciseGuide.of(name)
+        if (guide != null && onOpenGif != null) {
+            AsyncImage(
+                model = ExerciseGuide.assetUri(guide.gifAsset),
+                contentDescription = name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .combinedClickable(onClick = { onOpenGif() }, onLongClick = { onOpenGif() })
+            )
+            Spacer(Modifier.width(8.dp))
+        }
 
         // п8: карандаш для переименования своего упражнения
         if (onRename != null) {

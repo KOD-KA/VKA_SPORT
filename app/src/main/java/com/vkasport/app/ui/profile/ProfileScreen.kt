@@ -64,7 +64,15 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     val context = LocalContext.current
     val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yy") }
 
-    LaunchedEffect(Unit) { viewModel.loadBodyMetrics(); viewModel.loadUserProfile() }
+    // ИСПРАВЛЕНО: профиль тоже перезагружает архив — иначе вес из только что
+    // завершённой тренировки не попадал в график (архив грузился лишь на
+    // вкладке «Архив»)
+    LaunchedEffect(Unit) {
+        viewModel.loadBodyMetrics()
+        viewModel.loadUserProfile()
+        viewModel.loadArchiveFromDatabase()
+        viewModel.loadRecordsFromDatabase()
+    }
 
     // workouts отсортирован DESC (новые первые) → самая ПЕРВАЯ тренировка
     // в жизни — это ПОСЛЕДНИЙ элемент списка. Здесь lastOrNull() корректен.
@@ -80,8 +88,9 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     val weightHistory = remember(workouts, bodyMetrics) { viewModel.getWeightHistory() }
     val currentWeight = weightHistory.lastOrNull()?.second
     val userProfile by viewModel.userProfile.collectAsState()
-    // Вес для ИМТ и сравнения: ручной из профиля приоритетнее авто-веса
-    val effectiveWeight = userProfile?.weightKg ?: currentWeight
+    // Вес для ИМТ и сравнения: САМАЯ СВЕЖАЯ запись (тренировки + журнал тела),
+    // а если истории нет — значение из профиля
+    val effectiveWeight = currentWeight ?: userProfile?.weightKg
     val profileHeight = userProfile?.heightCm
     val bmi = if (profileHeight != null && profileHeight > 0f && effectiveWeight != null)
         effectiveWeight / ((profileHeight / 100f) * (profileHeight / 100f)) else null
@@ -198,12 +207,14 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
+                // Вес отсюда убран — он показан в карточке «вес, кг» ниже
+                // (раньше числа могли расходиться и это путало)
                 Text(
                     userProfile?.name?.takeIf { it.isNotBlank() } ?: "Ваше имя",
                     color = Black, fontSize = 22.sp, fontWeight = FontWeight.Bold
                 )
-                currentWeight?.let {
-                    Text("Текущий вес: %.1f кг".format(it), color = DarkGray, fontSize = 13.sp)
+                profileHeight?.let {
+                    Text("Рост: ${it.toInt()} см", color = DarkGray, fontSize = 13.sp)
                 }
             }
             Text(
