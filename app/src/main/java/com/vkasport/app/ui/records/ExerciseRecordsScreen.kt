@@ -164,7 +164,9 @@ fun ExerciseRecordsScreen(
                     SimpleLineChart(
                         values = mainPoints.map { it.second },
                         startLabel = mainPoints.firstOrNull()?.first?.format(chartDateFmt),
-                        endLabel = mainPoints.lastOrNull()?.first?.format(chartDateFmt)
+                        endLabel = mainPoints.lastOrNull()?.first?.format(chartDateFmt),
+                        pointLabels = mainPoints.map { it.first.format(chartDateFmt) },
+                        title = rec.exerciseName + " — вся история"
                     )
                 }
 
@@ -187,7 +189,9 @@ fun ExerciseRecordsScreen(
                         SimpleLineChart(
                             values = volumePoints.map { it.second },
                             startLabel = volumePoints.firstOrNull()?.first?.format(chartDateFmt),
-                            endLabel = volumePoints.lastOrNull()?.first?.format(chartDateFmt)
+                            endLabel = volumePoints.lastOrNull()?.first?.format(chartDateFmt),
+                            pointLabels = volumePoints.map { it.first.format(chartDateFmt) },
+                            title = "Объём: " + rec.exerciseName
                         )
                     }
 

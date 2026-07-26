@@ -310,7 +310,9 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             SimpleLineChart(
                 values = weightHistory.map { it.second },
                 startLabel = weightHistory.firstOrNull()?.first?.format(dateFmt),
-                endLabel = weightHistory.lastOrNull()?.first?.format(dateFmt)
+                endLabel = weightHistory.lastOrNull()?.first?.format(dateFmt),
+                pointLabels = weightHistory.map { it.first.format(dateFmt) },
+                title = "Вес, кг — вся история"
             )
         }
 
@@ -373,7 +375,9 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             SimpleLineChart(
                 values = metricPoints.map { it.second },
                 startLabel = metricPoints.firstOrNull()?.first?.format(dateFmt),
-                endLabel = metricPoints.lastOrNull()?.first?.format(dateFmt)
+                endLabel = metricPoints.lastOrNull()?.first?.format(dateFmt),
+                pointLabels = metricPoints.map { it.first.format(dateFmt) },
+                title = metricOptions[selectedMetric].first + ", см — вся история"
             )
         }
 
