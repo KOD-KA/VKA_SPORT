@@ -10,6 +10,8 @@ import com.vkasport.app.data.local.entity.PlannedExerciseEntity
 import com.vkasport.app.data.local.entity.PlannedWorkoutEntity
 import com.vkasport.app.data.local.entity.BodyMetricEntity
 import com.vkasport.app.data.local.entity.UserProfileEntity
+import android.util.Base64
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -20,6 +22,7 @@ import org.json.JSONObject
  *
  * ПРАВИЛА ВЕРСИОНИРОВАНИЯ ФОРМАТА:
  *  - formatVersion 1: исходный формат (вес × повторы)
+ *  - formatVersion 5: + фото профиля (Base64, сжатое ~512px JPEG)
  *  - formatVersion 4: + профиль (имя, рост, вес; фото не переносится)
  *  - formatVersion 3: + журнал тела (bodyMetrics)
  *  - formatVersion 2: + measureType у упражнений/своих упражнений,
@@ -31,7 +34,7 @@ import org.json.JSONObject
  */
 object BackupManager {
 
-    const val FORMAT_VERSION = 4
+    const val FORMAT_VERSION = 5
 
     // Идентификатор приложения в файле бэкапа. STYRK — текущий, VKA_SPORT —
     // историческое имя до ребрендинга (импорт принимает оба).
@@ -155,6 +158,16 @@ object BackupManager {
             p.name?.let { pObj.put("name", it) }
             p.heightCm?.let { pObj.put("heightCm", it.toDouble()) }
             p.weightKg?.let { pObj.put("weightKg", it.toDouble()) }
+            // v5: фото профиля переносится внутри бэкапа (Base64).
+            // Файл уже сжат при выборе (~512px JPEG), поэтому строка небольшая.
+            p.photoPath?.let { path ->
+                runCatching {
+                    val f = File(path)
+                    if (f.exists() && f.length() < 3_000_000) {
+                        pObj.put("photoBase64", Base64.encodeToString(f.readBytes(), Base64.NO_WRAP))
+                    }
+                }
+            }
             root.put("profile", pObj)
         }
 
@@ -163,7 +176,7 @@ object BackupManager {
 
     // ==================== ИМПОРТ ====================
 
-    suspend fun importJson(db: WorkoutDatabase, json: String) = withContext(Dispatchers.IO) {
+    suspend fun importJson(db: WorkoutDatabase, json: String, filesDir: File? = null) = withContext(Dispatchers.IO) {
         val root = try {
             JSONObject(json)
         } catch (_: Exception) {
@@ -182,6 +195,7 @@ object BackupManager {
             2 -> importV2(db, root)
             3 -> importV3(db, root)
             4 -> importV4(db, root)
+            5 -> importV5(db, root, filesDir)
             else -> throw IllegalArgumentException(
                 "Бэкап формата версии $v — эта версия приложения его не знает. Обновите приложение."
             )
@@ -193,7 +207,34 @@ object BackupManager {
      * v2-часть переиспользуется напрямую — она читает только известные ей
      * поля, а bodyMetrics докидываем отдельно (clearAllTables уже внутри).
      */
-    /** Парсер формата v4 (текущий): всё из v3 + профиль пользователя. */
+    /**
+     * Парсер формата v5 (текущий): всё из v4 + фото профиля.
+     * Фото раскодируется в файл во внутренней памяти приложения, путь
+     * записывается в профиль (пути с чужого устройства не переносимы).
+     */
+    private suspend fun importV5(db: WorkoutDatabase, root: JSONObject, filesDir: File?) {
+        importV4(db, root)
+        val p = root.optJSONObject("profile") ?: return
+        val b64 = if (p.has("photoBase64")) p.getString("photoBase64") else return
+        val dir = filesDir ?: return
+        runCatching {
+            val bytes = Base64.decode(b64, Base64.NO_WRAP)
+            val file = File(dir, "profile_photo_restored_" + System.currentTimeMillis() + ".jpg")
+            file.writeBytes(bytes)
+            val cur = db.userProfileDao().get()
+            db.userProfileDao().upsert(
+                UserProfileEntity(
+                    id = 1,
+                    name = cur?.name,
+                    photoPath = file.absolutePath,
+                    heightCm = cur?.heightCm,
+                    weightKg = cur?.weightKg
+                )
+            )
+        }
+    }
+
+    /** Парсер формата v4. ЗАМОРОЖЕН. */
     private suspend fun importV4(db: WorkoutDatabase, root: JSONObject) {
         importV3(db, root)
         root.optJSONObject("profile")?.let { p ->

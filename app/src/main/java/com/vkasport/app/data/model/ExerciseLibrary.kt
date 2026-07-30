@@ -5,6 +5,17 @@ object ExerciseLibrary {
     val exercises = listOf(
 
         // ===== ГРУДЬ =====
+        ExerciseCatalog("Сведение в кроссовере снизу вверх", MuscleGroup.CHEST),
+        ExerciseCatalog("Сведение в кроссовере сверху вниз", MuscleGroup.CHEST),
+        ExerciseCatalog("Жим гантелей на наклонной вверх (верх груди)", MuscleGroup.CHEST),
+        ExerciseCatalog("Жим гантелей на наклонной скамье нейтральным хватом", MuscleGroup.CHEST),
+        ExerciseCatalog("Сведение в кроссовере снизу вверх", MuscleGroup.CHEST),
+        ExerciseCatalog("Сведение в кроссовере сверху вниз", MuscleGroup.CHEST),
+        ExerciseCatalog("Жим гантелей на наклонной вниз",  MuscleGroup.CHEST),
+        ExerciseCatalog("Сведение в тренажёре («бабочка»)", MuscleGroup.CHEST),
+        ExerciseCatalog("Жим в Смите лёжа",                MuscleGroup.CHEST),
+        ExerciseCatalog("Отжимания с широкой постановкой", MuscleGroup.CHEST),
+        ExerciseCatalog("Разводка на наклонной скамье",    MuscleGroup.CHEST),
         ExerciseCatalog("Жим штанги лёжа",              MuscleGroup.CHEST),
         ExerciseCatalog("Жим штанги на наклонной скамье", MuscleGroup.CHEST),
         ExerciseCatalog("Жим гантелей лёжа",             MuscleGroup.CHEST),
@@ -17,6 +28,16 @@ object ExerciseLibrary {
         ExerciseCatalog("Отжимания на брусьях",           MuscleGroup.CHEST),
 
         // ===== СПИНА =====
+        ExerciseCatalog("Тяга в хаммере (рычажная)",        MuscleGroup.BACK),
+        ExerciseCatalog("Тяга верхнего блока раздельными рукоятями", MuscleGroup.BACK),
+        ExerciseCatalog("Тяга верхнего блока с раздельными рукоятями", MuscleGroup.BACK),
+        ExerciseCatalog("Тяга в хаммере на спину", MuscleGroup.BACK),
+        ExerciseCatalog("Тяга гантелей в наклоне двумя руками", MuscleGroup.BACK),
+        ExerciseCatalog("Тяга блока одной рукой",         MuscleGroup.BACK),
+        ExerciseCatalog("Пуловер в блоке",                 MuscleGroup.BACK),
+        ExerciseCatalog("Тяга нижнего блока широким хватом", MuscleGroup.BACK),
+        ExerciseCatalog("Шраги с гантелями",               MuscleGroup.BACK),
+        ExerciseCatalog("Подтягивания широким хватом",     MuscleGroup.BACK),
         ExerciseCatalog("Становая тяга",                  MuscleGroup.BACK),
         ExerciseCatalog("Тяга верхнего блока",            MuscleGroup.BACK),
         ExerciseCatalog("Тяга верхнего блока узким хватом", MuscleGroup.BACK),
@@ -29,6 +50,13 @@ object ExerciseLibrary {
         ExerciseCatalog("Тяга Т-грифа",                    MuscleGroup.BACK),
 
         // ===== НОГИ =====
+        ExerciseCatalog("Приседания в Смите",              MuscleGroup.LEGS),
+        ExerciseCatalog("Жим ногами узкой постановкой",    MuscleGroup.LEGS),
+        ExerciseCatalog("Сведение ног в тренажёре",        MuscleGroup.LEGS),
+        ExerciseCatalog("Разведение ног в тренажёре",      MuscleGroup.LEGS),
+        ExerciseCatalog("Подъемы на носки сидя",           MuscleGroup.LEGS),
+        ExerciseCatalog("Зашагивания на платформу",        MuscleGroup.LEGS),
+        ExerciseCatalog("Ягодичный мостик со штангой",     MuscleGroup.LEGS),
         ExerciseCatalog("Приседания со штангой",          MuscleGroup.LEGS),
         ExerciseCatalog("Фронтальные приседания",         MuscleGroup.LEGS),
         ExerciseCatalog("Жим ногами",                     MuscleGroup.LEGS),
@@ -41,6 +69,15 @@ object ExerciseLibrary {
         ExerciseCatalog("Гакк-приседания",                 MuscleGroup.LEGS),
 
         // ===== ПЛЕЧИ =====
+        ExerciseCatalog("Отведение руки в сторону в кроссовере", MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Подъем руки перед собой на блоке", MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Махи в сторону на нижнем блоке", MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Подъем руки перед собой на блоке", MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Жим в тренажёре на плечи",        MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Разводка в тренажёре (задняя дельта)", MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Подъем гантелей перед собой",     MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Махи в стороны на блоке",         MuscleGroup.SHOULDERS),
+        ExerciseCatalog("Жим гантелей стоя",               MuscleGroup.SHOULDERS),
         ExerciseCatalog("Жим штанги стоя",                MuscleGroup.SHOULDERS),
         ExerciseCatalog("Жим гантелей сидя",              MuscleGroup.SHOULDERS),
         ExerciseCatalog("Жим Арнольда",                    MuscleGroup.SHOULDERS),
@@ -50,6 +87,16 @@ object ExerciseLibrary {
         ExerciseCatalog("Разводка в кроссовере на плечи", MuscleGroup.SHOULDERS),
 
         // ===== БИЦЕПС =====
+        ExerciseCatalog("Сгибания Зоттмана сидя",           MuscleGroup.BICEPS),
+        ExerciseCatalog("Скамья Скотта одной рукой",        MuscleGroup.BICEPS),
+        ExerciseCatalog("Сгибания рук в кроссовере (двойной бицепс)", MuscleGroup.BICEPS),
+        ExerciseCatalog("Сгибания Зоттмана сидя", MuscleGroup.BICEPS),
+        ExerciseCatalog("Скамья Скотта одной рукой", MuscleGroup.BICEPS),
+        ExerciseCatalog("Сгибания на верхних блоках («двойной бицепс»)", MuscleGroup.BICEPS),
+        ExerciseCatalog("Подъем на бицепс на блоке",       MuscleGroup.BICEPS),
+        ExerciseCatalog("Подъем гантелей сидя на наклонной", MuscleGroup.BICEPS),
+        ExerciseCatalog("Подъем с EZ-грифом",              MuscleGroup.BICEPS),
+        ExerciseCatalog("Сгибания в тренажёре",            MuscleGroup.BICEPS),
         ExerciseCatalog("Подъем штанги на бицепс",        MuscleGroup.BICEPS),
         ExerciseCatalog("Подъем гантелей на бицепс",      MuscleGroup.BICEPS),
         ExerciseCatalog("Молотки с гантелями",             MuscleGroup.BICEPS),
@@ -58,6 +105,17 @@ object ExerciseLibrary {
         ExerciseCatalog("Подъем штанги обратным хватом",  MuscleGroup.BICEPS),
 
         // ===== ТРИЦЕПС =====
+        ExerciseCatalog("Разгибание на трицепс с прямой рукоятью", MuscleGroup.TRICEPS),
+        ExerciseCatalog("Разгибание на трицепс с канатом",  MuscleGroup.TRICEPS),
+        ExerciseCatalog("Разгибание на трицепс одной рукой в блоке", MuscleGroup.TRICEPS),
+        ExerciseCatalog("Разгибание на трицепс с прямой рукоятью", MuscleGroup.TRICEPS),
+        ExerciseCatalog("Разгибание на трицепс с канатом", MuscleGroup.TRICEPS),
+        ExerciseCatalog("Разгибание на трицепс одной рукой", MuscleGroup.TRICEPS),
+        ExerciseCatalog("Разгибание с канатом на блоке",   MuscleGroup.TRICEPS),
+        ExerciseCatalog("Отжимания на брусьях с весом",    MuscleGroup.TRICEPS),
+        ExerciseCatalog("Французский жим с гантелями",     MuscleGroup.TRICEPS),
+        ExerciseCatalog("Кикбэк с гантелью",               MuscleGroup.TRICEPS),
+        ExerciseCatalog("Отжимания от скамьи",             MuscleGroup.TRICEPS, MeasureType.REPS),
         ExerciseCatalog("Французский жим",                MuscleGroup.TRICEPS),
         ExerciseCatalog("Разгибание рук на блоке",        MuscleGroup.TRICEPS),
         ExerciseCatalog("Жим узким хватом",               MuscleGroup.TRICEPS),
@@ -65,6 +123,11 @@ object ExerciseLibrary {
         ExerciseCatalog("Разгибание на блоке одной рукой", MuscleGroup.TRICEPS),
 
         // ===== ПРЕСС =====
+        ExerciseCatalog("Планка с подъемом ноги",          MuscleGroup.ABS, MeasureType.TIME),
+        ExerciseCatalog("Подъем ног лёжа",                 MuscleGroup.ABS, MeasureType.REPS),
+        ExerciseCatalog("Складка",                          MuscleGroup.ABS, MeasureType.REPS),
+        ExerciseCatalog("Ролик для пресса",                MuscleGroup.ABS, MeasureType.REPS),
+        ExerciseCatalog("Вакуум живота",                   MuscleGroup.ABS, MeasureType.TIME),
         ExerciseCatalog("Скручивания",                     MuscleGroup.ABS),
         ExerciseCatalog("Подъем ног в висе",               MuscleGroup.ABS),
         // ИЗМЕНЕНО (модель v2): планка считается ВРЕМЕНЕМ удержания
@@ -100,6 +163,11 @@ object ExerciseLibrary {
         ExerciseCatalog("Растяжка бицепса",                 MuscleGroup.STRETCH, MeasureType.TIME),
 
         // ===== УЛИЦА (турники, брусья, воркаут) =====
+        ExerciseCatalog("Подтягивания узким хватом",       MuscleGroup.STREET),
+        ExerciseCatalog("Отжимания с хлопком",             MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Вис на турнике",                  MuscleGroup.STREET, MeasureType.TIME),
+        ExerciseCatalog("Подъем ног на брусьях",           MuscleGroup.STREET, MeasureType.REPS),
+        ExerciseCatalog("Отжимания в стойке на руках",     MuscleGroup.STREET, MeasureType.REPS),
         // Повторяющиеся имена (Подтягивания, Отжимания и т.п.) СПЕЦИАЛЬНО
         // совпадают с залом — история и рекорды у упражнения общие,
         // независимо от того, где оно сделано. Тип у одноимённых упражнений
@@ -118,6 +186,11 @@ object ExerciseLibrary {
         ExerciseCatalog("Скакалка",                         MuscleGroup.STREET, MeasureType.TIME),
 
         // ===== ДОМ (без оборудования) =====
+        ExerciseCatalog("Отжимания с узкой постановкой",   MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Прыжки «звёздочка»",              MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Подъем на носки стоя (дома)",     MuscleGroup.HOME, MeasureType.REPS),
+        ExerciseCatalog("Планка боковая с поворотом",      MuscleGroup.HOME, MeasureType.TIME),
+        ExerciseCatalog("Приседания с прыжком",            MuscleGroup.HOME, MeasureType.REPS),
         ExerciseCatalog("Отжимания",                        MuscleGroup.HOME),
         ExerciseCatalog("Приседания без веса",              MuscleGroup.HOME, MeasureType.REPS),
         ExerciseCatalog("Выпады на месте",                  MuscleGroup.HOME, MeasureType.REPS),
@@ -132,6 +205,10 @@ object ExerciseLibrary {
         ExerciseCatalog("Берпи",                            MuscleGroup.HOME, MeasureType.REPS),
 
         // ===== ЖИРОСЖИГАНИЕ (кардио) =====
+        ExerciseCatalog("Ходьба быстрым шагом",            MuscleGroup.FAT_BURN, MeasureType.DISTANCE),
+        ExerciseCatalog("Airbike",                          MuscleGroup.FAT_BURN, MeasureType.CARDIO),
+        ExerciseCatalog("Гребля на улице",                 MuscleGroup.FAT_BURN, MeasureType.DISTANCE),
+        ExerciseCatalog("Бой с тенью",                     MuscleGroup.FAT_BURN, MeasureType.TIME),
         // CARDIO = нагрузка тренажёра / скорость / время
         // DISTANCE = дистанция + время (улица)
         ExerciseCatalog("Беговая дорожка",                  MuscleGroup.FAT_BURN, MeasureType.CARDIO),

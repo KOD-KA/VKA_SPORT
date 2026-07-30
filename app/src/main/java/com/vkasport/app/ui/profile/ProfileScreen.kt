@@ -124,7 +124,8 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             text = {
                 Text(
                     "Все текущие данные (архив, рекорды, план, свои упражнения, " +
-                            "журнал тела) будут ЗАМЕНЕНЫ данными из файла. Отменить это будет нельзя."
+                            "журнал тела, профиль и фото) будут ЗАМЕНЕНЫ данными из файла. " +
+                            "Отменить это будет нельзя."
                 )
             },
             confirmButton = {
@@ -770,12 +771,32 @@ private fun bmiCategory(bmi: Float?): String = when {
     else          -> "ИМТ · ожирение"
 }
 
-/** Копирует выбранное фото во внутреннюю память приложения, возвращает путь. */
+/**
+ * Копирует выбранное фото во внутреннюю память приложения, возвращает путь.
+ *
+ * v1.7.1: фото УМЕНЬШАЕТСЯ до ~512px и пережимается в JPEG 85% — так оно
+ * занимает ~50–150 КБ и спокойно помещается внутрь файла бэкапа (п2).
+ */
 private fun copyProfilePhoto(context: android.content.Context, uri: Uri): String? {
     return try {
+        val source = context.contentResolver.openInputStream(uri)?.use {
+            android.graphics.BitmapFactory.decodeStream(it)
+        } ?: return null
+
+        val maxSide = 512
+        val scale = maxSide.toFloat() / maxOf(source.width, source.height)
+        val bitmap = if (scale < 1f) {
+            android.graphics.Bitmap.createScaledBitmap(
+                source,
+                (source.width * scale).toInt().coerceAtLeast(1),
+                (source.height * scale).toInt().coerceAtLeast(1),
+                true
+            )
+        } else source
+
         val file = java.io.File(context.filesDir, "profile_photo_${System.currentTimeMillis()}.jpg")
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            file.outputStream().use { output -> input.copyTo(output) }
+        file.outputStream().use { out ->
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
         }
         file.absolutePath
     } catch (_: Exception) {

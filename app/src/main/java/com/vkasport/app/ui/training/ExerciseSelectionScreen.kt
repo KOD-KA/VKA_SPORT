@@ -53,7 +53,14 @@ fun ExerciseSelectionScreen(
     var renamingName by remember { mutableStateOf<String?>(null) }
     // п5: имя упражнения, для которого открыта увеличенная гифка
     var gifDialogName by remember { mutableStateOf<String?>(null) }
-    val libraryExercises = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
+    // v1.7.1 (п5): поиск по упражнениям внутри группы
+    var searchQuery by remember(muscleGroup) { mutableStateOf("") }
+    val allLibrary = ExerciseLibrary.exercises.filter { it.muscleGroup == muscleGroup }
+    val q = searchQuery.trim().lowercase()
+    val libraryExercises = if (q.isBlank()) allLibrary
+    else allLibrary.filter { it.name.lowercase().contains(q) }
+    val shownCustom = if (q.isBlank()) customExercises
+    else customExercises.filter { it.lowercase().contains(q) }
     var addingCustom by remember(muscleGroup) { mutableStateOf(false) }
     var customText by remember(muscleGroup) { mutableStateOf("") }
     // «Как считать» — для растяжки по умолчанию время, иначе вес×повторы
@@ -93,8 +100,47 @@ fun ExerciseSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
 
+            // ── ПОИСК (п5) ─────────────────────────────────────────────
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Поиск упражнения…", color = DarkGray, fontSize = 14.sp) },
+                    leadingIcon = { Text("🔍", fontSize = 15.sp) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            Text(
+                                "✕", color = DarkGray, fontSize = 15.sp,
+                                modifier = Modifier
+                                    .clickable { searchQuery = "" }
+                                    .padding(10.dp)
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Black, unfocusedBorderColor = DarkGray.copy(alpha = 0.3f),
+                        cursorColor = Black, focusedTextColor = Black, unfocusedTextColor = Black
+                    )
+                )
+            }
+
+            // Ничего не найдено
+            if (q.isNotBlank() && libraryExercises.isEmpty() && shownCustom.isEmpty()) {
+                item {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Ничего не найдено", color = DarkGray, fontSize = 13.sp)
+                    }
+                }
+            }
+
             // ── Повторить как в прошлый раз ────────────────────────────
-            if (lastGroupExercises.isNotEmpty()) {
+            if (lastGroupExercises.isNotEmpty() && q.isBlank()) {
                 item {
                     Column(
                         modifier = Modifier
@@ -148,7 +194,7 @@ fun ExerciseSelectionScreen(
             }
 
             // ── Свои упражнения ──────────────────────────────────────
-            if (customExercises.isNotEmpty()) {
+            if (shownCustom.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -159,7 +205,7 @@ fun ExerciseSelectionScreen(
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
-                items(customExercises) { name ->
+                items(shownCustom) { name ->
                     val isAdded = name in alreadyAdded
                     ExerciseListItem(
                         name = name, isAdded = isAdded, isCustom = true,

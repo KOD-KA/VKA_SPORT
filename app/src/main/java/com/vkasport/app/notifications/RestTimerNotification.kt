@@ -68,7 +68,7 @@ object RestTimerNotification {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_rest_timer)
+            .setSmallIcon(R.drawable.ic_notification_dumbbell)
             .setContentTitle("Отдых после подхода")
             .setContentText("VKA SPORT — тренировка идёт")
             .setWhen(startMillis)

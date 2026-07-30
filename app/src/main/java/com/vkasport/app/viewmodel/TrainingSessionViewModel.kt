@@ -854,7 +854,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
                     context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                 } ?: throw IllegalStateException("Не удалось открыть файл")
 
-                BackupManager.importJson(database, json)
+                BackupManager.importJson(database, json, context.filesDir)
 
                 // Полная перезагрузка всего состояния из восстановленной БД
                 _restTimerStart.value = null
