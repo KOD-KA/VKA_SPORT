@@ -80,7 +80,14 @@ object RestTimerNotification {
             .setContentIntent(contentIntent)
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        // Разрешение проверено выше, но система может отозвать его в любой
+        // момент — ловим SecurityException явно, чтобы приложение не падало
+        // (и чтобы линтер не ругался на «call requires permission»).
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        } catch (_: SecurityException) {
+            // нет разрешения на уведомления — просто ничего не показываем
+        }
     }
 
     fun cancel(context: Context) {

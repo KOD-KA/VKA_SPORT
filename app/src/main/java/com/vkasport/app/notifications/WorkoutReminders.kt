@@ -68,7 +68,13 @@ object WorkoutReminders {
             .setContentIntent(contentIntent)
             .build()
 
-        NotificationManagerCompat.from(context).notify(id, notification)
+        // canNotify() проверен выше, но разрешение может быть отозвано —
+        // обрабатываем SecurityException явно
+        try {
+            NotificationManagerCompat.from(context).notify(id, notification)
+        } catch (_: SecurityException) {
+            // нет разрешения на уведомления — тихо выходим
+        }
     }
 
     // id уведомлений: чётные/нечётные от id запланированной тренировки,

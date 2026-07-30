@@ -2,6 +2,7 @@ package com.vkasport.app.ui.profile
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -786,11 +787,9 @@ private fun copyProfilePhoto(context: android.content.Context, uri: Uri): String
         val maxSide = 512
         val scale = maxSide.toFloat() / maxOf(source.width, source.height)
         val bitmap = if (scale < 1f) {
-            android.graphics.Bitmap.createScaledBitmap(
-                source,
+            source.scale(
                 (source.width * scale).toInt().coerceAtLeast(1),
-                (source.height * scale).toInt().coerceAtLeast(1),
-                true
+                (source.height * scale).toInt().coerceAtLeast(1)
             )
         } else source
 
