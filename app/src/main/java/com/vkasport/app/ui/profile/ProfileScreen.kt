@@ -158,6 +158,9 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
 
     // ===== ФОТО ПРОФИЛЯ + РЕДАКТИРОВАНИЕ (п1, п2) =====
     var showProfileDialog by remember { mutableStateOf(false) }
+    // п8: пояснение к ИМТ; п9: подтверждение удаления замера
+    var showBmiInfo by remember { mutableStateOf(false) }
+    var pendingDeleteMetric by remember { mutableStateOf<BodyMetricEntity?>(null) }
     val photoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -178,6 +181,90 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             onSave = { name, h, w ->
                 viewModel.saveUserProfile(name.ifBlank { null }, userProfile?.photoPath, h, w)
                 showProfileDialog = false
+            }
+        )
+    }
+
+    // ── п8: ЧТО ТАКОЕ ИМТ ──
+    if (showBmiInfo) {
+        AlertDialog(
+            onDismissRequest = { showBmiInfo = false },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            confirmButton = { TextButton(onClick = { showBmiInfo = false }) { Text("Понятно", color = Black) } },
+            title = { Text("Индекс массы тела (ИМТ)", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("ФОРМУЛА", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text("ИМТ = вес (кг) ÷ рост² (м)", color = Black, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    if (profileHeight != null && effectiveWeight != null && bmi != null) {
+                        val m = profileHeight / 100f
+                        Text(
+                            "Ваш расчёт: %.1f ÷ (%.2f × %.2f) = %.1f".format(
+                                effectiveWeight, m, m, bmi
+                            ),
+                            color = Black, fontSize = 13.sp
+                        )
+                    } else {
+                        Text(
+                            "Заполните рост и вес в профиле — тогда покажем ваш расчёт",
+                            color = DarkGray, fontSize = 13.sp
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("НОРМЫ (ВОЗ)", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    listOf(
+                        "менее 18.5 — дефицит массы",
+                        "18.5 – 24.9 — норма",
+                        "25.0 – 29.9 — избыточная масса",
+                        "30.0 – 34.9 — ожирение I степени",
+                        "35.0 – 39.9 — ожирение II степени",
+                        "40.0 и выше — ожирение III степени"
+                    ).forEach {
+                        Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 2.dp)) {
+                            Text("•", color = Black, fontSize = 13.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(it, color = Black, fontSize = 13.sp, lineHeight = 18.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Важно: ИМТ не различает мышцы и жир. У атлетов с большой мышечной массой " +
+                                "он часто показывает «избыток» при низком проценте жира — ориентируйтесь " +
+                                "также на замеры и внешний вид.",
+                        color = DarkGray, fontSize = 12.sp, lineHeight = 17.sp
+                    )
+                }
+            }
+        )
+    }
+
+    // ── п9: ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ ЗАМЕРА ──
+    pendingDeleteMetric?.let { metric ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteMetric = null },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            title = { Text("Удалить замер?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Запись за " + LocalDate.ofEpochDay(metric.date).format(dateFmt) +
+                            " будет удалена без возможности восстановления."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteBodyMetric(metric.id)
+                    pendingDeleteMetric = null
+                }) { Text("Удалить", color = Black, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteMetric = null }) { Text("Отмена", color = DarkGray) }
             }
         )
     }
@@ -237,7 +324,11 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             Spacer(Modifier.width(12.dp))
             StatCard(effectiveWeight?.let { "%.1f".format(it) } ?: "—", "вес, кг", Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
-            StatCard(bmi?.let { "%.1f".format(it) } ?: "—", bmiCategory(bmi), Modifier.weight(1f))
+            StatCard(
+                bmi?.let { "%.1f".format(it) } ?: "—",
+                bmiCategory(bmi),
+                Modifier.weight(1f).clickable { showBmiInfo = true }
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -424,7 +515,7 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                     Text(
                         "✕", color = DarkGray, fontSize = 13.sp,
                         modifier = Modifier
-                            .clickable { viewModel.deleteBodyMetric(m.id) }
+                            .clickable { pendingDeleteMetric = m }
                             .padding(4.dp)
                     )
                 }

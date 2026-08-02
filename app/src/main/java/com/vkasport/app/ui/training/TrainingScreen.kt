@@ -22,6 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import com.vkasport.app.data.model.ExerciseGuide
 import com.vkasport.app.data.model.MeasureType
 import kotlin.time.Duration.Companion.seconds
 import com.vkasport.app.data.model.MuscleGroup
@@ -278,6 +284,8 @@ private fun InlineExerciseBlock(
 ) {
     // addingSet=true — форма добавления НОВОГО подхода в конец
     // editingIndex!=null — форма редактирования УЖЕ введённого подхода
+    // п6 (v1.8.1): показ гифки+техники по тапу на название упражнения
+    var showGuide by remember(exercise.id) { mutableStateOf(false) }
     var addingSet by remember(exercise.id) { mutableStateOf(false) }
     var editingIndex by remember(exercise.id) { mutableStateOf<Int?>(null) }
     var weightInput by remember(exercise.id) { mutableStateOf("") }
@@ -362,6 +370,45 @@ private fun InlineExerciseBlock(
         focusManager.clearFocus()
     }
 
+    // ── п6: ОКНО С ГИФКОЙ И ТЕХНИКОЙ ──
+    if (showGuide) {
+        val guide = ExerciseGuide.of(exercise.name)
+        AlertDialog(
+            onDismissRequest = { showGuide = false },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            confirmButton = {
+                TextButton(onClick = { showGuide = false }) { Text("Закрыть", color = Black) }
+            },
+            title = { Text(exercise.name, fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    if (guide != null) {
+                        AsyncImage(
+                            model = ExerciseGuide.assetUri(guide.gifAsset),
+                            contentDescription = exercise.name,
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("ТЕХНИКА", color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        guide.technique.forEach { tip ->
+                            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 2.dp)) {
+                                Text("•", color = Black, fontSize = 13.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(tip, color = Black, fontSize = 13.sp, lineHeight = 18.sp)
+                            }
+                        }
+                    } else {
+                        Text("Для этого упражнения пока нет описания", fontSize = 13.sp)
+                    }
+                }
+            }
+        )
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp)
     ) {
@@ -371,11 +418,23 @@ private fun InlineExerciseBlock(
                 .background(DarkGray, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
-                exercise.name,
-                color = White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp,
-                modifier = Modifier.align(Alignment.CenterStart).padding(end = 30.dp)
-            )
+            // п6: тап по названию открывает гифку и технику выполнения
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(end = 30.dp)
+                    .clickable { showGuide = true },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    exercise.name,
+                    color = White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp
+                )
+                if (ExerciseGuide.of(exercise.name) != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("▶", color = White.copy(alpha = 0.6f), fontSize = 11.sp)
+                }
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)

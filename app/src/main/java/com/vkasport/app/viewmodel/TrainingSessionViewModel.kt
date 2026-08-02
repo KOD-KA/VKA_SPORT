@@ -215,7 +215,23 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
     }
 
     fun updateAthleteWeight(w: Float) { setState(_state.value.copy(athleteWeight = w)) }
-    fun startTraining() { setState(_state.value.copy(trainingStarted = true, currentScreen = "weight")) }
+    /**
+     * Старт тренировки по кнопке «НАЧАТЬ ТРЕНИРОВКУ».
+     *
+     * п7 (v1.8.1): здесь ЗАНОВО ставится время начала. Раньше оно
+     * фиксировалось при создании состояния (запуск приложения или сброс),
+     * поэтому брошенные попытки («дошёл до выбора упражнений и вышел»)
+     * оставляли старое время и длительность тренировки была завышена.
+     */
+    fun startTraining() {
+        setState(
+            _state.value.copy(
+                trainingStarted = true,
+                currentScreen = "weight",
+                workoutStartTime = LocalDateTime.now()
+            )
+        )
+    }
 
     /**
      * Запуск ЗАПЛАНИРОВАННОЙ тренировки (в т.ч. заранее, до её даты).
@@ -246,6 +262,20 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         _navigateToTraining.value = _navigateToTraining.value + 1
     }
     fun setCurrentScreen(s: String) {
+        // п7 (v1.8.1): возврат на стартовый экран = попытка не состоялась.
+        // Сбрасываем отсчёт, иначе «висящее» время попадёт в следующую
+        // тренировку и её длительность будет завышена.
+        if (s == "start") {
+            _restTimerStart.value = null
+            setState(
+                _state.value.copy(
+                    currentScreen = "start",
+                    trainingStarted = false,
+                    workoutStartTime = LocalDateTime.now()
+                )
+            )
+            return
+        }
         // Запускаем таймер отдыха при первом входе на экран тренировки,
         // чтобы он показывал время ещё до первого записанного подхода
         if (s == "training" && _restTimerStart.value == null) {
@@ -721,10 +751,14 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         return when (measureType) {
             // Со своим весом (maxWeight = 0) рекорд считается по повторам
             MeasureType.WEIGHT_REPS ->
-                // Рекорд = максимальный вес И при этом не меньше повторов, чем
-                // в рекордном подходе. Иначе 45×9 ошибочно считался рекордом
-                // наравне с 45×10 (тот же вес, но меньше повторов).
-                if (r.maxWeight > 0f) set.weight > 0f && set.weight >= r.maxWeight && set.reps >= r.maxWeightReps
+                // ИСПРАВЛЕНО (v1.8.1, п5): рекорд засчитывается если
+                //  – взят НОВЫЙ максимальный вес (даже с меньшим числом повторов), ИЛИ
+                //  – тот же максимальный вес, но повторов не меньше рекордных.
+                // Раньше требовалось И то и другое — новый макс. вес с меньшим
+                // числом повторов рекордом не считался.
+                if (r.maxWeight > 0f)
+                    set.weight > r.maxWeight ||
+                            (set.weight > 0f && set.weight == r.maxWeight && set.reps >= r.maxWeightReps)
                 else set.reps > 0 && set.reps >= r.maxReps
             MeasureType.REPS        -> set.reps > 0 && set.reps >= r.maxReps
             MeasureType.TIME        -> (set.seconds ?: 0) > 0 && (set.seconds ?: 0) >= (r.bestSeconds ?: 0)
