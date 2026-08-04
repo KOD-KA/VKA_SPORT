@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.vkasport.app.data.local.entity.BodyMetricEntity
 import com.vkasport.app.data.model.StrengthStandard
 import com.vkasport.app.data.model.StrengthStandards
@@ -53,9 +54,12 @@ import java.time.temporal.ChronoUnit
 /**
  * Вкладка «Профиль» (страница 4 Pager).
  *
- * Разделы: сводная статистика, ТЕЛО (вес и замеры с графиками),
- * ДАННЫЕ (бэкап/восстановление), О приложении.
- * Дальше добавятся: прогресс, сравнение с нормативами, пожертвования.
+ * Один экран с прокруткой: шапка, физические данные, сводная статистика,
+ * ТЕЛО (вес и замеры с графиками), сравнение с нормативами.
+ *
+ * v1.8.4: то, что открывают редко, свёрнуто в компактные строки —
+ * журнал замеров, «Данные», «Поддержать автора», «О приложении».
+ * Каждая строка открывает своё окно и не занимает место на экране.
  */
 @Composable
 fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel) {
@@ -161,6 +165,11 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
     // п8: пояснение к ИМТ; п9: подтверждение удаления замера
     var showBmiInfo by remember { mutableStateOf(false) }
     var pendingDeleteMetric by remember { mutableStateOf<BodyMetricEntity?>(null) }
+    // v1.8.4: содержимое свёрнутых строк — каждое в своём окне
+    var showMetricsJournal by remember { mutableStateOf(false) }
+    var showDataDialog     by remember { mutableStateOf(false) }
+    var showSupportDialog  by remember { mutableStateOf(false) }
+    var showAboutDialog    by remember { mutableStateOf(false) }
     val photoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -267,6 +276,149 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
                 TextButton(onClick = { pendingDeleteMetric = null }) { Text("Отмена", color = DarkGray) }
             }
         )
+    }
+
+    // Версия приложения нужна и в строке, и в окне «О приложении»
+    val versionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // ── ОКНО: ЖУРНАЛ ЗАМЕРОВ ──
+    if (showMetricsJournal && bodyMetrics.isNotEmpty()) {
+        MetricsJournalDialog(
+            metrics = bodyMetrics,
+            dateFmt = dateFmt,
+            onDelete = { m ->
+                // Сначала закрываем журнал, иначе подтверждение удаления
+                // откроется поверх него и экран станет «двухслойным»
+                showMetricsJournal = false
+                pendingDeleteMetric = m
+            },
+            onDismiss = { showMetricsJournal = false }
+        )
+    }
+
+    // ── ОКНО: ДАННЫЕ (бэкап / восстановление) ──
+    if (showDataDialog) {
+        Dialog(onDismissRequest = { showDataDialog = false }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(White, RoundedCornerShape(18.dp))
+                    .padding(16.dp)
+            ) {
+                Text("Данные", color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                ActionButton(
+                    emoji = "💾",
+                    title = "Сохранить бэкап",
+                    subtitle = "Все данные в один файл — архив, рекорды, план, свои упражнения, журнал тела"
+                ) {
+                    showDataDialog = false
+                    val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    exportLauncher.launch("styrk_backup_$today.json")
+                }
+                Spacer(Modifier.height(10.dp))
+                ActionButton(
+                    emoji = "📂",
+                    title = "Восстановить из бэкапа",
+                    subtitle = "Заменит текущие данные данными из файла (работает и со старыми версиями бэкапов)"
+                ) {
+                    showDataDialog = false
+                    importLauncher.launch(arrayOf("*/*"))
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { showDataDialog = false }) { Text("Закрыть", color = Black) }
+                }
+            }
+        }
+    }
+
+    // ── ОКНО: ПОДДЕРЖАТЬ АВТОРА ──
+    if (showSupportDialog) {
+        Dialog(onDismissRequest = { showSupportDialog = false }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(White, RoundedCornerShape(18.dp))
+                    .padding(16.dp)
+            ) {
+                Text("Поддержать автора", color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Приложение развивается силами одного человека. " +
+                            "Любая поддержка помогает добавлять новые функции.",
+                    color = DarkGray, fontSize = 13.sp, lineHeight = 18.sp
+                )
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Black, RoundedCornerShape(14.dp))
+                        .clickable {
+                            // Открываем страницу поддержки во внешнем браузере.
+                            // Try/catch на случай, если браузера на устройстве нет.
+                            try {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, DONATION_URL.toUri())
+                                )
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
+                            }
+                            showSupportDialog = false
+                        }
+                        .padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("❤️", fontSize = 18.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Открыть страницу поддержки", color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { showSupportDialog = false }) { Text("Закрыть", color = Black) }
+                }
+            }
+        }
+    }
+
+    // ── ОКНО: О ПРИЛОЖЕНИИ ──
+    if (showAboutDialog) {
+        Dialog(onDismissRequest = { showAboutDialog = false }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(White, RoundedCornerShape(18.dp))
+                    .padding(16.dp)
+            ) {
+                Text("О приложении", color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "STYRK — дневник тренировок: подходы, рекорды, архив, " +
+                            "календарь с напоминаниями, таймер отдыха и журнал тела.",
+                    color = DarkGray, fontSize = 13.sp, lineHeight = 18.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = SoftGray, thickness = 1.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "STYRK" + (versionName?.let { " · версия $it" } ?: ""),
+                    color = DarkGray, fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { showAboutDialog = false }) { Text("Закрыть", color = Black) }
+                }
+            }
+        }
     }
 
     Column(
@@ -488,38 +640,17 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
             Text("+ ЗАПИСАТЬ ЗАМЕРЫ", color = White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
 
-        // Последние записи журнала (новые сверху)
+        // Журнал замеров свёрнут в одну строку (v1.8.4): раньше список
+        // занимал пол-экрана. Тап открывает окно со ВСЕЙ историей,
+        // там же удаление отдельной записи.
         if (bodyMetrics.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
-            bodyMetrics.takeLast(5).reversed().forEach { m ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp)
-                        .background(SoftGray, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        LocalDate.ofEpochDay(m.date).format(dateFmt),
-                        color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    val summary = listOfNotNull(
-                        m.weight?.let { "вес ${SetFormat.num(it)}" },
-                        m.chest?.let { "грудь ${SetFormat.num(it)}" },
-                        m.waist?.let { "талия ${SetFormat.num(it)}" },
-                        m.biceps?.let { "бицепс ${SetFormat.num(it)}" }
-                    ).joinToString(" · ").ifEmpty { "запись" }
-                    Text(summary, color = DarkGray, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                    Text(
-                        "✕", color = DarkGray, fontSize = 13.sp,
-                        modifier = Modifier
-                            .clickable { pendingDeleteMetric = m }
-                            .padding(4.dp)
-                    )
-                }
-            }
+            CompactRow(
+                emoji = "📓",
+                title = "Журнал замеров",
+                subtitle = "записей: ${bodyMetrics.size} · последняя " +
+                        LocalDate.ofEpochDay(bodyMetrics.last().date).format(dateFmt)
+            ) { showMetricsJournal = true }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -561,104 +692,136 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
 
         Spacer(Modifier.height(24.dp))
 
-        // ===== ДАННЫЕ: БЭКАП / ВОССТАНОВЛЕНИЕ =====
-        Text("ДАННЫЕ", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(10.dp))
-
-        ActionButton(
+        // ===== СВЁРНУТЫЕ РАЗДЕЛЫ (v1.8.4) =====
+        // Раньше здесь были три больших блока: бэкап, поддержка и «о
+        // приложении». Они открываются редко, а места занимали много —
+        // теперь это три строки, содержимое в отдельных окнах.
+        CompactRow(
             emoji = "💾",
-            title = "Сохранить бэкап",
-            subtitle = "Все данные в один файл — архив, рекорды, план, свои упражнения, журнал тела"
-        ) {
-            val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-            exportLauncher.launch("styrk_backup_$today.json")
-        }
-        Spacer(Modifier.height(10.dp))
-        ActionButton(
-            emoji = "📂",
-            title = "Восстановить из бэкапа",
-            subtitle = "Заменит текущие данные данными из файла (работает и со старыми версиями бэкапов)"
-        ) {
-            importLauncher.launch(arrayOf("*/*"))
-        }
+            title = "Данные",
+            subtitle = "Сохранить бэкап или восстановить из файла"
+        ) { showDataDialog = true }
+
+        Spacer(Modifier.height(8.dp))
+
+        CompactRow(
+            emoji = "❤️",
+            title = "Поддержать автора",
+            subtitle = "Приложение развивается силами одного человека"
+        ) { showSupportDialog = true }
+
+        Spacer(Modifier.height(8.dp))
+
+        CompactRow(
+            emoji = "ℹ️",
+            title = "О приложении",
+            subtitle = "STYRK" + (versionName?.let { " · версия $it" } ?: "")
+        ) { showAboutDialog = true }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
 
-        // ===== ПОДДЕРЖАТЬ АВТОРА =====
-        Text("ПОДДЕРЖКА", color = Black, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(10.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Black, RoundedCornerShape(16.dp))
-                .clickable {
-                    // Открываем страницу поддержки во внешнем браузере/приложении.
-                    // Try/catch на случай, если на устройстве нет браузера.
-                    try {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, DONATION_URL.toUri())
-                        )
-                    } catch (_: Exception) {
-                        Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("❤️", fontSize = 22.sp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Поддержать автора", color = White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "Приложение развивается силами одного человека. Любая поддержка помогает добавлять новые функции.",
-                    color = White.copy(alpha = 0.7f), fontSize = 11.sp, lineHeight = 15.sp
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("→", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+// ===== КОМПАКТНАЯ СТРОКА-ПУНКТ (открывает своё окно) =====
+@Composable
+private fun CompactRow(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SoftGray, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(emoji, fontSize = 17.sp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(2.dp))
+            Text(subtitle, color = DarkGray, fontSize = 11.sp, lineHeight = 15.sp)
         }
+        Spacer(Modifier.width(8.dp))
+        Text("→", color = DarkGray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+    }
+}
 
-        Spacer(Modifier.weight(1f, fill = true))
-        Spacer(Modifier.height(28.dp))
-
-        // ===== О ПРИЛОЖЕНИИ =====
-        val versionName = remember {
-            try {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName
-            } catch (_: Exception) {
-                null
-            }
-        }
-
+// ===== ЖУРНАЛ ЗАМЕРОВ: ОТДЕЛЬНОЕ ОКНО =====
+@Composable
+private fun MetricsJournalDialog(
+    metrics: List<BodyMetricEntity>,
+    dateFmt: DateTimeFormatter,
+    onDelete: (BodyMetricEntity) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
-                .background(SoftGray, RoundedCornerShape(16.dp))
+                .background(White, RoundedCornerShape(18.dp))
                 .padding(16.dp)
         ) {
-            Text("О ПРИЛОЖЕНИИ", color = Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "STYRK — дневник тренировок: подходы, рекорды, архив, " +
-                        "календарь с напоминаниями, таймер отдыха и журнал тела.",
-                color = DarkGray,
-                fontSize = 12.sp,
-                lineHeight = 17.sp
-            )
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = White, thickness = 1.dp)
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = "STYRK" + (versionName?.let { " · версия $it" } ?: ""),
-                color = DarkGray,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+            Text("Журнал замеров", color = Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(2.dp))
+            Text("всего записей: ${metrics.size}", color = DarkGray, fontSize = 11.sp)
+            Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(16.dp))
+            // Новые сверху. Высота ограничена: длинный журнал прокручивается
+            // внутри окна и не вылезает за края экрана.
+            Column(
+                Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                metrics.reversed().forEach { m ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .background(SoftGray, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            LocalDate.ofEpochDay(m.date).format(dateFmt),
+                            color = Black, fontSize = 12.sp, fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        val summary = listOfNotNull(
+                            m.weight?.let { "вес ${SetFormat.num(it)}" },
+                            m.chest?.let { "грудь ${SetFormat.num(it)}" },
+                            m.waist?.let { "талия ${SetFormat.num(it)}" },
+                            m.hips?.let { "бёдра ${SetFormat.num(it)}" },
+                            m.biceps?.let { "бицепс ${SetFormat.num(it)}" },
+                            m.forearm?.let { "предплечье ${SetFormat.num(it)}" },
+                            m.thigh?.let { "бедро ${SetFormat.num(it)}" },
+                            m.calf?.let { "икра ${SetFormat.num(it)}" },
+                            m.neck?.let { "шея ${SetFormat.num(it)}" },
+                            m.shoulders?.let { "плечи ${SetFormat.num(it)}" }
+                        ).joinToString(" · ").ifEmpty { "запись" }
+                        Text(
+                            summary, color = DarkGray, fontSize = 11.sp,
+                            lineHeight = 15.sp, modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            "✕", color = DarkGray, fontSize = 13.sp,
+                            modifier = Modifier
+                                .clickable { onDelete(m) }
+                                .padding(4.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("Закрыть", color = Black) }
+            }
+        }
     }
 }
 

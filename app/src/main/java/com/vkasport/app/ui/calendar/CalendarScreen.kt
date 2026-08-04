@@ -509,7 +509,7 @@ private fun AddPlannedWorkoutSheet(
                 Text("Группа мышц", fontSize = 12.sp, color = DarkGray, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(8.dp))
                 // 2 строки чипов
-                val groups = MuscleGroup.entries
+                val groups = MuscleGroup.visible
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (row in groups.chunked(3)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -57,7 +57,7 @@ fun MuscleGroupScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(MuscleGroup.entries) { group ->
+            items(MuscleGroup.visible) { group ->
                 Box(
                     modifier = Modifier
                         .height(90.dp)

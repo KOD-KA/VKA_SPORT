@@ -52,7 +52,7 @@ fun TrainingScreen(
     viewModel: TrainingSessionViewModel,
     onAddExerciseToGroup: (MuscleGroup) -> Unit,
     onAddNewGroup: () -> Unit,
-    onFinishWorkout: () -> Unit
+    onFinishWorkout: (java.time.LocalDateTime?) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val completedWorkouts by viewModel.completedWorkouts.collectAsState()
@@ -76,6 +76,8 @@ fun TrainingScreen(
     else null
 
     // Диалоги подтверждения удаления
+    // п1 (v1.8.2): подтверждение времени окончания для долгих тренировок
+    var showFinishTimeDialog by remember { mutableStateOf(false) }
     var confirmRemoveGroup by remember { mutableStateOf<MuscleGroup?>(null) }
     // ИСПРАВЛЕНО: храним весь WorkoutExercise (нужен и id для удаления,
     // и name для текста диалога), а не только имя
@@ -225,12 +227,147 @@ fun TrainingScreen(
                     .fillMaxWidth()
                     .height(50.dp)
                     .background(SoftGray, RoundedCornerShape(14.dp))
-                    .clickable { onFinishWorkout() },
+                    .clickable {
+                        // Если тренировка идёт дольше 3 часов — вероятно, забыли
+                        // нажать «Завершить». Спрашиваем реальное время окончания.
+                        val hours = java.time.Duration.between(
+                            state.workoutStartTime, java.time.LocalDateTime.now()
+                        ).toHours()
+                        if (hours >= 3) showFinishTimeDialog = true else onFinishWorkout(null)
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Text("ЗАВЕРШИТЬ ТРЕНИРОВКУ", color = Black, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
         }
+    }
+
+    // ===== п1: ПОДТВЕРЖДЕНИЕ ВРЕМЕНИ ОКОНЧАНИЯ (тренировка > 3 часов) =====
+    if (showFinishTimeDialog) {
+        val start = state.workoutStartTime
+        val now = java.time.LocalDateTime.now()
+        // Даты на выбор: от дня начала до сегодня (если тренировка перешла
+        // за полночь). Если всё в один день — выбора даты нет, только время.
+        val dayOptions = remember(start, now) {
+            val days = java.time.temporal.ChronoUnit.DAYS
+                .between(start.toLocalDate(), now.toLocalDate()).toInt().coerceIn(0, 7)
+            (0..days).map { start.toLocalDate().plusDays(it.toLong()) }
+        }
+        var selDate by remember { mutableStateOf(now.toLocalDate()) }
+        var hourStr by remember { mutableStateOf("%02d".format(now.hour)) }
+        var minStr by remember { mutableStateOf("%02d".format(now.minute)) }
+        val dFmt = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM") }
+        val dtFmt = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM HH:mm") }
+
+        val chosen = runCatching {
+            java.time.LocalDateTime.of(
+                selDate,
+                java.time.LocalTime.of(
+                    hourStr.toInt().coerceIn(0, 23),
+                    minStr.toInt().coerceIn(0, 59)
+                )
+            )
+        }.getOrNull()
+        val valid = chosen != null && !chosen.isBefore(start)
+
+        AlertDialog(
+            onDismissRequest = { showFinishTimeDialog = false },
+            containerColor = White,
+            titleContentColor = Black,
+            textContentColor = DarkGray,
+            title = { Text("Когда закончилась тренировка?", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        "Тренировка идёт уже больше 3 часов. Проверьте время окончания — " +
+                                "возможно, вы забыли нажать «Завершить».",
+                        fontSize = 13.sp, lineHeight = 18.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Начало: " + start.format(dtFmt), color = Black, fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+
+                    if (dayOptions.size > 1) {
+                        Text("Дата окончания", color = DarkGray, fontSize = 12.sp)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            dayOptions.forEach { d ->
+                                val sel = d == selDate
+                                Box(
+                                    Modifier
+                                        .background(
+                                            if (sel) Black else SoftGray,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { selDate = d }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        d.format(dFmt),
+                                        color = if (sel) White else Black,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    Text("Время окончания", color = DarkGray, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = hourStr, onValueChange = { hourStr = it.filter { c -> c.isDigit() }.take(2) },
+                            label = { Text("часы", color = DarkGray) },
+                            modifier = Modifier.width(100.dp), singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Black, unfocusedBorderColor = SoftGray,
+                                cursorColor = Black, focusedTextColor = Black, unfocusedTextColor = Black
+                            )
+                        )
+                        Text(" : ", color = Black, fontSize = 18.sp)
+                        OutlinedTextField(
+                            value = minStr, onValueChange = { minStr = it.filter { c -> c.isDigit() }.take(2) },
+                            label = { Text("минуты", color = DarkGray) },
+                            modifier = Modifier.width(110.dp), singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Black, unfocusedBorderColor = SoftGray,
+                                cursorColor = Black, focusedTextColor = Black, unfocusedTextColor = Black
+                            )
+                        )
+                    }
+                    if (!valid) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Окончание не может быть раньше начала тренировки",
+                            color = RedColor, fontSize = 12.sp
+                        )
+                    } else {
+                        val mins = java.time.Duration.between(start, chosen).toMinutes()
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Длительность: %d ч %02d мин".format(mins / 60, mins % 60),
+                            color = DarkGray, fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = valid,
+                    onClick = {
+                        showFinishTimeDialog = false
+                        onFinishWorkout(chosen)
+                    }
+                ) { Text("Завершить", color = if (valid) Black else DarkGray, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFinishTimeDialog = false }) { Text("Отмена", color = DarkGray) }
+            }
+        )
     }
 
     // ===== ДИАЛОГ: УДАЛИТЬ ГРУППУ МЫШЦ =====
@@ -384,7 +521,7 @@ private fun InlineExerciseBlock(
             title = { Text(exercise.name, fontWeight = FontWeight.Bold, fontSize = 15.sp) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    if (guide != null) {
+                    if (guide != null && guide.hasGif) {
                         AsyncImage(
                             model = ExerciseGuide.assetUri(guide.gifAsset),
                             contentDescription = exercise.name,

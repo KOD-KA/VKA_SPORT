@@ -161,7 +161,7 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                 ExerciseSelectionScreen(
                     muscleGroup = g,
                     alreadyAdded = state.selectedExercises.map { ex -> ex.name },
-                    customExercises = customExercises.filter { it.muscleGroup == g }.map { it.name },
+                    customExercises = customExercises.filter { g.sameAs(it.muscleGroup) }.map { it.name },
                     lastGroupExercises = lastGroupExercises,
                     onBack = { viewModel.setCurrentScreen("muscles") },
                     onRepeatLastGroup = {
@@ -199,8 +199,8 @@ fun TrainingFlowScreen(viewModel: TrainingSessionViewModel) {
                 onAddNewGroup = {
                     viewModel.setCurrentScreen("muscles")
                 },
-                onFinishWorkout = {
-                    viewModel.finishCurrentWorkout()
+                onFinishWorkout = { endTime ->
+                    viewModel.finishCurrentWorkout(endTime)
                 }
             )
         }

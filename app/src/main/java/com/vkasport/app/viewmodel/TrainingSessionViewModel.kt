@@ -192,10 +192,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
      */
     private fun resolveMeasureType(name: String, group: MuscleGroup?): MeasureType {
         ExerciseLibrary.exercises.find {
-            it.name.equals(name, ignoreCase = true) && (group == null || it.muscleGroup == group)
+            it.name.equals(name, ignoreCase = true) && (group == null || group.sameAs(it.muscleGroup))
         }?.let { return it.measureType }
         _customExercises.value.find {
-            it.name.equals(name, ignoreCase = true) && (group == null || it.muscleGroup == group)
+            it.name.equals(name, ignoreCase = true) && (group == null || group.sameAs(it.muscleGroup))
         }?.let { return it.measureType }
         return MeasureType.WEIGHT_REPS
     }
@@ -399,19 +399,19 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     fun getLastMuscleGroupExercises(group: MuscleGroup): List<String> {
         val last = _completedWorkouts.value
-            .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
+            .firstOrNull { workout -> workout.exercises.any { group.sameAs(it.muscleGroup) } }
             ?: return emptyList()
-        return last.exercises.filter { it.muscleGroup == group }.map { it.name }
+        return last.exercises.filter { group.sameAs(it.muscleGroup) }.map { it.name }
     }
 
     fun repeatLastMuscleGroup(group: MuscleGroup) {
         val lastWithGroup = _completedWorkouts.value
-            .firstOrNull { workout -> workout.exercises.any { it.muscleGroup == group } }
+            .firstOrNull { workout -> workout.exercises.any { group.sameAs(it.muscleGroup) } }
             ?: return
 
         val alreadyAdded = _state.value.selectedExercises.map { it.name }.toSet()
         val toAdd = lastWithGroup.exercises
-            .filter { it.muscleGroup == group && it.name !in alreadyAdded }
+            .filter { group.sameAs(it.muscleGroup) && it.name !in alreadyAdded }
             .map { WorkoutExercise(name = it.name, muscleGroup = group, measureType = it.measureType) }
 
         if (toAdd.isEmpty()) return
@@ -420,14 +420,23 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
 
     // ==================== FINISH WORKOUT ====================
 
-    fun finishCurrentWorkout() {
+    /**
+     * Завершение тренировки.
+     *
+     * v1.8.2 (п1): можно передать СВОЁ время окончания — экран тренировки
+     * спрашивает подтверждение, если тренировка длится дольше 3 часов
+     * (человек мог забыть нажать «Завершить»). По умолчанию — «сейчас».
+     */
+    fun finishCurrentWorkout(endTime: LocalDateTime? = null) {
         val s = _state.value
         // ИСПРАВЛЕНО: фиксируем момент ЗАВЕРШЕНИЯ один раз и используем его
         // и для БД, и для памяти — раньше в памяти использовалось время
         // НАЧАЛА тренировки (s.workoutStartTime), а в БД — момент
         // завершения, из-за чего сортировка и "последняя тренировка"
         // работали по-разному до и после перезагрузки архива из БД.
-        val finishTime = LocalDateTime.now()
+        // не раньше начала тренировки — защита от некорректного ввода
+        val finishTime = (endTime ?: LocalDateTime.now())
+            .coerceAtLeast(s.workoutStartTime)
         val durationMinutes = Duration.between(s.workoutStartTime, finishTime).toMinutes()
 
         val usedGroups = s.selectedExercises.mapNotNull { it.muscleGroup }.distinct()
@@ -691,7 +700,7 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         val trimmed = newName.trim()
         if (trimmed.isEmpty()) { onResult(false, "Название не может быть пустым"); return }
         if (trimmed.equals(oldName, ignoreCase = true)) { onResult(false, "Название не изменилось"); return }
-        val target = _customExercises.value.find { it.muscleGroup == group && it.name == oldName }
+        val target = _customExercises.value.find { group.sameAs(it.muscleGroup) && it.name == oldName }
         if (target == null) { onResult(false, "Упражнение не найдено"); return }
         val collision = ExerciseLibrary.exercises.any { it.name.equals(trimmed, ignoreCase = true) } ||
                 _customExercises.value.any { it.name.equals(trimmed, ignoreCase = true) }
@@ -715,10 +724,10 @@ class TrainingSessionViewModel(private val database: WorkoutDatabase) : ViewMode
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         val alreadyExists = _customExercises.value.any {
-            it.muscleGroup == group && it.name.equals(trimmed, ignoreCase = true)
+            group.sameAs(it.muscleGroup) && it.name.equals(trimmed, ignoreCase = true)
         }
         val existsInLibrary = ExerciseLibrary.exercises.any {
-            it.muscleGroup == group && it.name.equals(trimmed, ignoreCase = true)
+            group.sameAs(it.muscleGroup) && it.name.equals(trimmed, ignoreCase = true)
         }
         if (alreadyExists || existsInLibrary) return
 
