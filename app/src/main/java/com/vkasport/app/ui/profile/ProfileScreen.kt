@@ -697,6 +697,22 @@ fun ProfileScreen(viewModel: com.vkasport.app.viewmodel.TrainingSessionViewModel
         // приложении». Они открываются редко, а места занимали много —
         // теперь это три строки, содержимое в отдельных окнах.
         CompactRow(
+            emoji = "🎧",
+            title = "Музыка для тренировок",
+            subtitle = "Плейлист в Яндекс Музыке — откроется в приложении или браузере"
+        ) {
+            // Ссылка открывается снаружи: в приложении «Яндекс Музыка»,
+            // если оно установлено, иначе в браузере.
+            try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, MUSIC_URL.toUri()))
+            } catch (_: Exception) {
+                Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        CompactRow(
             emoji = "💾",
             title = "Данные",
             subtitle = "Сохранить бэкап или восстановить из файла"
@@ -1014,6 +1030,10 @@ private fun StandardCard(
 
 // Ссылка на страницу поддержки автора (Boosty). Поменять здесь при
 // необходимости — единственное место, где задаётся адрес.
+// Плейлист для тренировок (Яндекс Музыка)
+private const val MUSIC_URL =
+    "https://music.yandex.ru/playlists/f2f96823-c096-e64b-8257-9acc9cbfd21d"
+
 private const val DONATION_URL =
     "https://boosty.to/rstrtrt1/purchase/4022729?ssource=DIRECT&share=subscription_link"
 // ===== ИМТ, копирование фото, диалог профиля (п1, п2) =====
